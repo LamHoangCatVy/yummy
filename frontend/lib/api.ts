@@ -24,7 +24,7 @@ export const api = {
     setOllama: (base_url: string, model: string) =>
       request('/config/ollama', { method: 'POST', body: JSON.stringify({ base_url, model }) }),
 
-    setProvider: (provider: 'gemini' | 'ollama') =>
+    setProvider: (provider: 'gemini' | 'ollama' | 'copilot') =>
       request('/config/provider', { method: 'POST', body: JSON.stringify({ provider }) }),
 
     setup: (github_url: string, token: string, max_scan_limit: number) =>
@@ -32,6 +32,9 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ github_url, token, max_scan_limit }),
       }),
+
+    setCopilot: (token: string, model?: string) =>
+      request('/config/copilot', { method: 'POST', body: JSON.stringify({ token, model }) }),
 
     status: () => request('/config/status'),
   },

@@ -51,5 +51,7 @@ API_CONFIG: Dict[str, str] = {
     "gemini_model": os.getenv("GEMINI_MODEL", GEMINI_MODEL),
     "ollama_base_url": os.getenv("OLLAMA_BASE_URL", ""),
     "ollama_model": os.getenv("OLLAMA_MODEL", "llama3"),
-    "provider": os.getenv("AI_PROVIDER", "gemini"),  # "gemini" | "ollama"
+    "copilot_token": os.getenv("COPILOT_GITHUB_TOKEN", os.getenv("GH_TOKEN", os.getenv("GITHUB_TOKEN", ""))),
+    "copilot_model": os.getenv("COPILOT_MODEL", "gpt-4o"),
+    "provider": os.getenv("AI_PROVIDER", "gemini"),  # "gemini" | "ollama" | "copilot"
 }

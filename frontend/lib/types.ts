@@ -87,12 +87,14 @@ export interface ScanStatus {
 
 export interface SystemStatus {
   repo: { owner: string; repo: string; branch?: string } | null
-  ai_provider: 'gemini' | 'ollama'
+  ai_provider: 'gemini' | 'ollama' | 'copilot'
   has_gemini_key: boolean
   gemini_model?: string
   has_github_token: boolean
   ollama_url?: string
   ollama_model?: string
+  has_copilot_token?: boolean
+  copilot_model?: string
   kb_files: number
   kb_insights: number
   kb_has_summary: boolean

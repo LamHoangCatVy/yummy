@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
+import ProviderSection from '@/components/ProviderSection'
 import type {
   Session, SystemStatus, KnowledgeBase, ScanStatus,
   MetricsData, ChatMessage, FileNode
@@ -310,8 +311,8 @@ function AgentCard({ dot, title, loading, content, editable, editValue, onEditCh
 type RightTab = 'ide' | 'graph' | 'wiki' | 'insights' | 'rag' | 'sdlc' | 'backlog' | 'db'
 type LeftTab = 'chat' | 'sessions' | 'tracing' | 'settings'
 
-export default function WorkspacePage({ params }: { params: { sessionId: string } }) {
-  const { sessionId } = params
+export default function WorkspacePage({ params }: { params: Promise<{ sessionId: string }> }) {
+  const { sessionId } = React.use(params)
   const router = useRouter()
 
   const [leftW, setLeftW] = useState(36)
@@ -345,11 +346,13 @@ export default function WorkspacePage({ params }: { params: { sessionId: string 
   const [suggestionIdx, setSuggestionIdx] = useState(0)
 
   // ── settings form state ──────────────────────────────────────────────────────
-  const [cfgProvider, setCfgProvider] = useState<'gemini' | 'ollama'>('gemini')
+  const [cfgProvider, setCfgProvider] = useState<'gemini' | 'ollama' | 'copilot'>('gemini')
   const [cfgGeminiKey, setCfgGeminiKey] = useState('')
   const [cfgGeminiModel, setCfgGeminiModel] = useState('')
   const [cfgOllamaUrl, setCfgOllamaUrl] = useState('')
   const [cfgOllamaModel, setCfgOllamaModel] = useState('')
+  const [cfgCopilotToken, setCfgCopilotToken] = useState('')
+  const [cfgCopilotModel, setCfgCopilotModel] = useState('')
   const [cfgGithubToken, setCfgGithubToken] = useState('')
   const [cfgSaving, setCfgSaving] = useState(false)
   const [cfgMsg, setCfgMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -357,6 +360,10 @@ export default function WorkspacePage({ params }: { params: { sessionId: string 
 
   const termRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<any>(null)
+  // Tracks the previous leftTab value so the settings form is only seeded from
+  // server state when the user *switches* to the settings tab, not on every
+  // background poll that updates `status`.
+  const prevLeftTabRef = useRef<string>('')
 
   // ── fetchers ────────────────────────────────────────────────────────────────
 
@@ -398,12 +405,17 @@ export default function WorkspacePage({ params }: { params: { sessionId: string 
 
   useEffect(() => {
     if (leftTab === 'tracing') fetchMetrics()
-    if (leftTab === 'settings' && status) {
+    // Only seed the settings form from server state when the user first opens
+    // the settings tab (tab switch). Polling updates to `status` must NOT reset
+    // fields the user has already edited but not yet saved.
+    if (leftTab === 'settings' && prevLeftTabRef.current !== 'settings' && status) {
       setCfgProvider(status.ai_provider)
       setCfgGeminiModel(status.gemini_model || '')
       setCfgOllamaUrl(status.ollama_url || '')
       setCfgOllamaModel(status.ollama_model || '')
+      setCfgCopilotModel(status.copilot_model || '')
     }
+    prevLeftTabRef.current = leftTab
   }, [leftTab, fetchMetrics, status])
 
   // sync session state once on session change
@@ -524,7 +536,7 @@ export default function WorkspacePage({ params }: { params: { sessionId: string 
 
   // ── settings save ────────────────────────────────────────────────────────────
 
-  const saveSettings = async (section: 'gemini' | 'ollama' | 'provider' | 'github') => {
+  const saveSettings = async (section: 'gemini' | 'ollama' | 'copilot' | 'provider' | 'github') => {
     setCfgSaving(true); setCfgMsg(null)
     try {
       if (section === 'provider') {
@@ -541,6 +553,12 @@ export default function WorkspacePage({ params }: { params: { sessionId: string 
         await api.config.setProvider('ollama')
         setCfgProvider('ollama')
         setCfgMsg({ ok: true, text: 'Ollama config saved.' })
+      } else if (section === 'copilot') {
+        if (!cfgCopilotToken) throw new Error('GitHub token is required.')
+        await api.config.setCopilot(cfgCopilotToken, cfgCopilotModel || undefined)
+        await api.config.setProvider('copilot')
+        setCfgProvider('copilot')
+        setCfgMsg({ ok: true, text: 'Copilot config saved.' })
       } else if (section === 'github') {
         await api.config.setup(status?.repo ? `https://github.com/${status.repo.owner}/${status.repo.repo}` : '', cfgGithubToken, status ? 10000 : 10000)
         setCfgMsg({ ok: true, text: 'GitHub token saved.' })
@@ -954,16 +972,16 @@ export default function WorkspacePage({ params }: { params: { sessionId: string 
 
           {/* ── SETTINGS ── */}
           {leftTab === 'settings' && (
-            <div className="flex flex-col h-full overflow-auto">
+            <div className="flex flex-col h-full">
 
               {/* status bar */}
-              <div className="flex items-center gap-2 px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
-                <span className="text-2xs uppercase tracking-widest" style={{ color: 'var(--text-3)' }}>Active provider</span>
-                <span className="text-2xs font-bold px-2 py-0.5 rounded" style={{ background: cfgProvider === 'gemini' ? 'var(--green-mute)' : 'rgba(255,179,0,.12)', color: cfgProvider === 'gemini' ? 'var(--green)' : 'var(--amber)', border: `1px solid ${cfgProvider === 'gemini' ? 'var(--green-dim)' : 'var(--amber-dim)'}` }}>
+              <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
+                <span className="text-2xs uppercase tracking-widest whitespace-nowrap" style={{ color: 'var(--text-3)' }}>Active provider</span>
+                <span className="text-2xs font-bold px-2 py-0.5 rounded whitespace-nowrap" style={{ background: cfgProvider === 'gemini' ? 'var(--green-mute)' : cfgProvider === 'copilot' ? 'rgba(100,160,255,.12)' : 'rgba(255,179,0,.12)', color: cfgProvider === 'gemini' ? 'var(--green)' : cfgProvider === 'copilot' ? '#64a0ff' : 'var(--amber)', border: `1px solid ${cfgProvider === 'gemini' ? 'var(--green-dim)' : cfgProvider === 'copilot' ? 'rgba(100,160,255,.4)' : 'var(--amber-dim)'}` }}>
                   {status?.ai_provider?.toUpperCase() ?? '—'}
                 </span>
                 {cfgMsg && (
-                  <span className="ml-auto text-2xs px-2 py-0.5 rounded" style={{ color: cfgMsg.ok ? 'var(--green)' : 'var(--red)', background: cfgMsg.ok ? 'var(--green-mute)' : 'rgba(255,68,68,.1)', border: `1px solid ${cfgMsg.ok ? 'var(--green-dim)' : 'var(--red-dim)'}` }}>
+                  <span className="text-2xs px-2 py-0.5 rounded" style={{ color: cfgMsg.ok ? 'var(--green)' : 'var(--red)', background: cfgMsg.ok ? 'var(--green-mute)' : 'rgba(255,68,68,.1)', border: `1px solid ${cfgMsg.ok ? 'var(--green-dim)' : 'var(--red-dim)'}` }}>
                     {cfgMsg.ok ? '✓' : '✕'} {cfgMsg.text}
                   </span>
                 )}
@@ -971,26 +989,12 @@ export default function WorkspacePage({ params }: { params: { sessionId: string 
 
               <div className="flex flex-col gap-4 p-3 overflow-auto flex-1">
 
-                {/* ── Provider Toggle ── */}
-                <section className="rounded-lg border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
-                  <div className="px-3 py-2 border-b text-2xs uppercase tracking-widest font-bold" style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text-3)' }}>AI Provider</div>
-                  <div className="p-3 flex gap-2" style={{ background: 'var(--bg-1)' }}>
-                    {(['gemini', 'ollama'] as const).map(p => (
-                      <button key={p} onClick={() => setCfgProvider(p)}
-                        className="flex-1 py-2 rounded text-xs font-bold uppercase tracking-wide cursor-pointer border transition-colors"
-                        style={{ background: cfgProvider === p ? (p === 'gemini' ? 'var(--green-mute)' : 'rgba(255,179,0,.12)') : 'var(--bg-2)', color: cfgProvider === p ? (p === 'gemini' ? 'var(--green)' : 'var(--amber)') : 'var(--text-3)', borderColor: cfgProvider === p ? (p === 'gemini' ? 'var(--green-dim)' : 'var(--amber-dim)') : 'var(--border)' }}>
-                        {p === 'gemini' ? '✦ Gemini' : '⬡ Ollama'}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="px-3 pb-3" style={{ background: 'var(--bg-1)' }}>
-                    <button onClick={() => saveSettings('provider')} disabled={cfgSaving}
-                      className="w-full py-1.5 rounded text-xs font-bold cursor-pointer transition-colors"
-                      style={{ background: 'var(--green-mute)', color: 'var(--green)', border: '1px solid var(--green-dim)', opacity: cfgSaving ? .5 : 1 }}>
-                      {cfgSaving ? '⟳ Saving...' : 'Apply Provider'}
-                    </button>
-                  </div>
-                </section>
+                <ProviderSection
+                  cfgProvider={cfgProvider}
+                  cfgSaving={cfgSaving}
+                  onProviderChange={setCfgProvider}
+                  onApplyProvider={() => saveSettings('provider')}
+                />
 
                 {/* ── Gemini Config ── */}
                 <section className="rounded-lg border overflow-hidden" style={{ borderColor: cfgProvider === 'gemini' ? 'var(--green-dim)' : 'var(--border)' }}>
@@ -1067,6 +1071,52 @@ export default function WorkspacePage({ params }: { params: { sessionId: string 
                       className="w-full py-1.5 rounded text-xs font-bold cursor-pointer transition-colors"
                       style={{ background: 'rgba(255,179,0,.1)', color: 'var(--amber)', border: '1px solid var(--amber-dim)', opacity: cfgSaving ? .5 : 1 }}>
                       {cfgSaving ? '⟳ Saving...' : 'Save Ollama Config'}
+                    </button>
+                  </div>
+                </section>
+
+                {/* ── Copilot Config ── */}
+                <section className="rounded-lg border overflow-hidden" style={{ borderColor: cfgProvider === 'copilot' ? 'rgba(100,160,255,.4)' : 'var(--border)' }}>
+                  <div className="px-3 py-2 border-b text-2xs uppercase tracking-widest font-bold flex items-center gap-2" style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: cfgProvider === 'copilot' ? '#64a0ff' : 'var(--text-3)' }}>
+                    ⊕ GitHub Copilot
+                    {status?.has_copilot_token && <span className="text-2xs px-1.5 rounded" style={{ background: 'rgba(100,160,255,.1)', color: '#64a0ff', border: '1px solid rgba(100,160,255,.3)' }}>token set</span>}
+                  </div>
+                  <div className="p-3 flex flex-col gap-3" style={{ background: 'var(--bg-1)' }}>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-2xs uppercase tracking-wide" style={{ color: 'var(--text-3)' }}>GitHub Token</span>
+                      <input
+                        type="password"
+                        value={cfgCopilotToken}
+                        onChange={e => setCfgCopilotToken(e.target.value)}
+                        placeholder={status?.has_copilot_token ? '••••••••••••••••' : 'ghp_... or gho_...'}
+                        className="text-xs rounded px-2 py-1.5 font-mono w-full outline-none"
+                        style={{ background: 'var(--bg-2)', border: '1px solid var(--border-2)', color: 'var(--text)', caretColor: '#64a0ff' }}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-2xs uppercase tracking-wide" style={{ color: 'var(--text-3)' }}>Model</span>
+                      <select
+                        value={cfgCopilotModel}
+                        onChange={e => setCfgCopilotModel(e.target.value)}
+                        className="cursor-pointer text-xs rounded px-2 py-1.5 font-mono w-full outline-none"
+                        style={{ background: 'var(--bg-2)', border: '1px solid var(--border-2)', color: 'var(--text)' }}
+                      >
+                        <option value="">-- keep current ({status?.copilot_model ?? 'gpt-4o'}) --</option>
+                        <option value="gpt-4o">gpt-4o</option>
+                        <option value="gpt-4o-mini">gpt-4o-mini</option>
+                        <option value="gpt-5">gpt-5</option>
+                        <option value="o3-mini">o3-mini</option>
+                        <option value="claude-sonnet-4-5">claude-sonnet-4-5</option>
+                        <option value="claude-opus-4-5">claude-opus-4-5</option>
+                      </select>
+                    </label>
+                    <p className="text-2xs" style={{ color: 'var(--text-3)' }}>
+                      Requires an active GitHub Copilot subscription. Token needs <code className="px-1 rounded" style={{ background: 'var(--bg-3)', color: '#64a0ff' }}>copilot</code> scope.
+                    </p>
+                    <button onClick={() => saveSettings('copilot')} disabled={cfgSaving || !cfgCopilotToken}
+                      className="w-full py-1.5 rounded text-xs font-bold cursor-pointer transition-colors"
+                      style={{ background: 'rgba(100,160,255,.1)', color: '#64a0ff', border: '1px solid rgba(100,160,255,.35)', opacity: (cfgSaving || !cfgCopilotToken) ? .5 : 1 }}>
+                      {cfgSaving ? '⟳ Saving...' : 'Save Copilot Config'}
                     </button>
                   </div>
                 </section>
