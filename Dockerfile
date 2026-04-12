@@ -4,6 +4,8 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci --silent
 COPY frontend/ ./
+# Create public dir if missing (Next.js requires it)
+RUN mkdir -p public
 ENV NEXT_PUBLIC_API_URL=http://localhost:8000
 RUN npm run build
 
