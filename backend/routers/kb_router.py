@@ -15,8 +15,8 @@ router = APIRouter(prefix="/kb", tags=["Knowledge Base"])
 @router.get("")
 def get_knowledge_base():
     """
-    Xem knowledge base hiện tại.
-    Trả về tree, insights và project summary.
+    View the current knowledge base.
+    Returns tree, insights and project summary.
     """
     kb = DB["knowledge_base"]
     return {
@@ -32,43 +32,43 @@ def get_knowledge_base():
 @router.post("/scan")
 async def start_scan(background_tasks: BackgroundTasks):
     """
-    Bắt đầu quét và index codebase từ GitHub.
-    
-    - Chạy background (non-blocking)
-    - Poll GET /kb/scan/status để theo dõi tiến trình
-    - Kết quả lưu vào GET /kb
-    
-    Cần chạy POST /config/setup trước.
+    Start scanning and indexing the codebase from GitHub.
+
+    - Runs in the background (non-blocking)
+    - Poll GET /kb/scan/status to track progress
+    - Results are stored and accessible via GET /kb
+
+    Requires POST /config/setup to be called first.
     """
     require_repo()
 
     if DB.get("scan_status") and DB["scan_status"].get("running"):
         raise HTTPException(
             409,
-            "Scan đang chạy. Poll GET /kb/scan/status để theo dõi, hoặc đợi hoàn tất."
+            "Scan is already running. Poll GET /kb/scan/status to track progress."
         )
 
     background_tasks.add_task(run_scan)
     return {
         "status": "started",
-        "message": "Scan đang chạy background. Poll GET /kb/scan/status để theo dõi."
+        "message": "Scan started in background. Poll GET /kb/scan/status to track progress."
     }
 
 
 @router.get("/scan/status")
 def get_scan_status():
     """
-    Kiểm tra tiến trình scan hiện tại.
-    
+    Check the current scan progress.
+
     Response:
     - running: bool
-    - text: mô tả bước đang làm
+    - text: description of the current step
     - progress: 0-100
-    - error: true nếu có lỗi
+    - error: true if an error occurred
     """
     return DB.get("scan_status") or {
         "running": False,
-        "text": "Chưa có scan nào được khởi động.",
+        "text": "No scan has been started yet.",
         "progress": 0
     }
 
@@ -76,17 +76,16 @@ def get_scan_status():
 @router.get("/file")
 async def get_file_content(path: str):
     """
-    Xem nội dung của một file trong repo (IDE Simulator).
-    
+    View the content of a file in the repo (IDE Simulator).
+
     Query param:
-        path: Đường dẫn file, ví dụ: src/main.py
+        path: File path, e.g. src/main.py
     """
     ri = require_repo()
 
-    # Lấy default branch
     repo_resp = await github_fetch(f"/repos/{ri['owner']}/{ri['repo']}")
     if repo_resp.status_code != 200:
-        raise HTTPException(502, "Không thể kết nối GitHub API.")
+        raise HTTPException(502, "Unable to connect to GitHub API.")
     branch = repo_resp.json().get("default_branch", "main")
 
     content = await github_raw(ri["owner"], ri["repo"], branch, path)
@@ -101,9 +100,9 @@ async def get_file_content(path: str):
 @router.delete("")
 def clear_knowledge_base():
     """
-    Xóa toàn bộ knowledge base (tree, insights, summary).
-    Dùng trước khi scan lại từ đầu.
+    Clear the entire knowledge base (tree, insights, summary).
+    Use this before re-scanning from scratch.
     """
     DB["knowledge_base"] = {"tree": [], "insights": [], "project_summary": ""}
     DB["scan_status"] = None
-    return {"status": "ok", "message": "Knowledge base đã được xóa."}
+    return {"status": "ok", "message": "Knowledge base cleared."}

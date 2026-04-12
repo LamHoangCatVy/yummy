@@ -1,6 +1,6 @@
 """
 YUMMY Backend - Scan Service
-Background task để index codebase từ GitHub vào knowledge base.
+Background task to index a codebase from GitHub into the knowledge base.
 """
 
 import os
@@ -12,32 +12,32 @@ from services.github_service import get_repo_info, get_repo_tree, github_raw
 
 async def run_scan():
     """
-    Background task: quét GitHub repo, tạo AI insights và project wiki.
-    
+    Background task: scan a GitHub repo, generate AI insights and a project wiki.
+
     Flow:
-        1. Lấy repo metadata (default branch)
-        2. Lấy file tree, filter extensions + node_modules
-        3. Đọc từng file, gộp thành chunks ~35KB
-        4. Mỗi chunk → INDEXER agent tóm tắt
-        5. Tất cả insights → ARCHITECT agent viết Project Wiki
-    
-    Poll status qua GET /kb/scan/status.
+        1. Fetch repo metadata (default branch)
+        2. Fetch file tree, filter by extension and exclude node_modules
+        3. Read each file, group into ~35KB chunks
+        4. Each chunk -> INDEXER agent summarizes
+        5. All insights -> ARCHITECT agent writes Project Wiki
+
+    Poll status via GET /kb/scan/status.
     """
-    DB["scan_status"] = {"running": True, "text": "Kết nối GitHub API...", "progress": 0}
+    DB["scan_status"] = {"running": True, "text": "Connecting to GitHub API...", "progress": 0}
     DB["knowledge_base"] = {"tree": [], "insights": [], "project_summary": ""}
 
     try:
         ri = DB["repo_info"]
         max_limit = DB.get("max_scan_limit", 10000)
 
-        # --- Step 1: Lấy repo metadata ---
-        DB["scan_status"]["text"] = "Đọc thông tin repo..."
+        # --- Step 1: Fetch repo metadata ---
+        DB["scan_status"]["text"] = "Reading repo info..."
         repo_data = await get_repo_info(ri["owner"], ri["repo"])
         branch = repo_data["default_branch"]
-        DB["repo_info"]["branch"] = branch  # cache branch để dùng sau
+        DB["repo_info"]["branch"] = branch
 
-        # --- Step 2: Lấy file tree ---
-        DB["scan_status"]["text"] = "Lấy danh sách files..."
+        # --- Step 2: Fetch file tree ---
+        DB["scan_status"]["text"] = "Fetching file list..."
         all_files = await get_repo_tree(ri["owner"], ri["repo"], branch)
 
         valid_files = [
@@ -51,13 +51,13 @@ async def run_scan():
         if not valid_files:
             DB["scan_status"] = {
                 "running": False,
-                "text": "⚠️ Không tìm thấy file nào phù hợp trong repo.",
+                "text": "No matching files found in the repo.",
                 "progress": 0,
                 "error": True
             }
             return
 
-        # Khởi tạo tree với status "pending"
+        # Initialize tree with "pending" status
         DB["knowledge_base"]["tree"] = [
             {
                 "path": f["path"],
@@ -67,7 +67,7 @@ async def run_scan():
             for f in valid_files
         ]
 
-        # --- Step 3 & 4: Đọc file theo chunks, AI tóm tắt ---
+        # --- Steps 3 & 4: Read files in chunks, AI summarizes ---
         current_chunk = ""
         files_in_chunk = []
         insights = []
@@ -81,7 +81,6 @@ async def run_scan():
                 "progress": progress
             }
 
-            # Update tree status → processing
             _update_tree_status(file["path"], "processing")
 
             try:
@@ -89,27 +88,26 @@ async def run_scan():
                 current_chunk += f"\n--- FILE: {file['path']} ---\n{content}\n"
                 files_in_chunk.append(file["path"])
             except Exception:
-                # Skip file không đọc được (binary, quá lớn, v.v.)
+                # Skip files that cannot be read (binary, too large, etc.)
                 pass
 
-            # Update tree status → done
             _update_tree_status(file["path"], "done")
 
-            # Flush chunk nếu đủ lớn hoặc là file cuối
+            # Flush chunk if large enough or last file
             chunk_ready = len(current_chunk) >= 35_000 or i == total - 1
             if chunk_ready and current_chunk.strip() and files_in_chunk:
                 DB["scan_status"]["text"] = (
-                    f"AI đang vector hóa cụm {len(files_in_chunk)} file... "
-                    f"({len(insights) + 1} insight)"
+                    f"AI indexing chunk of {len(files_in_chunk)} files... "
+                    f"({len(insights) + 1} insights so far)"
                 )
 
                 summary = await call_ai(
                     "INDEXER",
-                    f"Tóm tắt logic code:\n{current_chunk}",
+                    f"Summarize the code logic:\n{current_chunk}",
                     (
-                        "Bạn là code indexer. Tóm tắt ngắn gọn chức năng, "
-                        "patterns và dependencies của các file này. "
-                        "KHÔNG bọc toàn bộ trong thẻ Markdown Code Block."
+                        "You are a code indexer. Briefly summarize the functionality, "
+                        "patterns and dependencies of these files. "
+                        "Do NOT wrap the entire output in a Markdown code block."
                     )
                 )
 
@@ -121,54 +119,53 @@ async def run_scan():
                 insights.append(insight)
                 DB["knowledge_base"]["insights"] = list(insights)
 
-                # Reset chunk
                 current_chunk = ""
                 files_in_chunk = []
 
         # --- Step 5: Project Wiki ---
         DB["scan_status"] = {
             "running": True,
-            "text": "Đang viết Corporate Wiki (Project Summary)...",
+            "text": "Writing Project Wiki (Project Summary)...",
             "progress": 90
         }
 
         all_insights_str = "\n\n".join(ins["summary"] for ins in insights)
         project_summary = await call_ai(
             "ARCHITECT",
-            f"Dựa vào các mảnh ghép kỹ thuật này:\n{all_insights_str}",
+            f"Based on these technical summaries:\n{all_insights_str}",
             (
-                f"Bạn là Chief Architect của dự án '{ri['repo']}'. "
-                "Viết PROJECT SUMMARY chuẩn GitBook bao gồm các mục:\n"
-                "# 📖 Introduction\n"
-                "## 🧩 Core Components\n"
-                "## ⚙️ Key Functions & APIs\n"
-                "## 🗄️ Data Models\n"
-                "## 🔐 Security Considerations\n"
-                "## 🚀 Deployment & Infrastructure\n"
-                "Trình bày Markdown sắc nét. "
-                "BẮT BUỘC KHÔNG bọc toàn bộ kết quả trong thẻ ```markdown. "
-                "TUYỆT ĐỐI KHÔNG bịa đặt thông tin."
+                f"You are the Chief Architect of the '{ri['repo']}' project. "
+                "Write a PROJECT SUMMARY in GitBook style with the following sections:\n"
+                "# Introduction\n"
+                "## Core Components\n"
+                "## Key Functions & APIs\n"
+                "## Data Models\n"
+                "## Security Considerations\n"
+                "## Deployment & Infrastructure\n"
+                "Use clean Markdown formatting. "
+                "Do NOT wrap the entire output in a ```markdown block. "
+                "Do NOT fabricate any information."
             )
         )
 
         DB["knowledge_base"]["project_summary"] = project_summary
         DB["scan_status"] = {
             "running": False,
-            "text": f"✅ Quét hoàn tất. Đã index {total} files, tạo {len(insights)} insights.",
+            "text": f"Scan complete. Indexed {total} files, generated {len(insights)} insights.",
             "progress": 100
         }
 
     except Exception as e:
         DB["scan_status"] = {
             "running": False,
-            "text": f"❌ Lỗi Scan: {str(e)}",
+            "text": f"Scan error: {str(e)}",
             "progress": 0,
             "error": True
         }
 
 
 def _update_tree_status(file_path: str, status: str):
-    """Helper: cập nhật status của file trong knowledge_base.tree."""
+    """Helper: update the status of a file in knowledge_base.tree."""
     for f in DB["knowledge_base"]["tree"]:
         if f["path"] == file_path:
             f["status"] = status

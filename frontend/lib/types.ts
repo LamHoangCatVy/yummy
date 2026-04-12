@@ -85,16 +85,34 @@ export interface ScanStatus {
   error?: boolean
 }
 
+export type KeySource = 'env' | 'ui' | 'none'
+
 export interface SystemStatus {
   repo: { owner: string; repo: string; branch?: string } | null
-  ai_provider: 'gemini' | 'ollama' | 'copilot'
+  ai_provider: 'gemini' | 'ollama' | 'copilot' | 'openai' | 'bedrock'
+  // Gemini
   has_gemini_key: boolean
+  gemini_key_source: KeySource
   gemini_model?: string
+  // GitHub
   has_github_token: boolean
+  // Ollama
   ollama_url?: string
   ollama_model?: string
+  // Copilot
   has_copilot_token?: boolean
+  copilot_key_source: KeySource
   copilot_model?: string
+  // OpenAI
+  has_openai_key?: boolean
+  openai_key_source: KeySource
+  openai_model?: string
+  // Bedrock
+  has_bedrock_key?: boolean
+  bedrock_key_source: KeySource
+  bedrock_region?: string
+  bedrock_model?: string
+  // KB & misc
   kb_files: number
   kb_insights: number
   kb_has_summary: boolean

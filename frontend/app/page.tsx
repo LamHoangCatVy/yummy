@@ -2,12 +2,14 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
+import { loadSavedTheme } from '@/lib/theme'
 
 export default function Home() {
   const router = useRouter()
   const [status, setStatus] = useState<'loading' | 'ready'>('loading')
   const [dots, setDots] = useState('')
 
+  useEffect(() => { loadSavedTheme() }, [])
   useEffect(() => {
     const iv = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 400)
     return () => clearInterval(iv)
@@ -36,16 +38,14 @@ export default function Home() {
     <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-bg font-mono">
       {/* ASCII-style logo */}
       <pre
-        className="text-green text-[0.7rem] leading-[1.3] text-center"
-        style={{ textShadow: '0 0 20px rgba(0,255,136,0.4)' }}
-      >{`
-██╗   ██╗██╗   ██╗███╗   ███╗███╗   ███╗██╗   ██╗
+        className="text-green text-[0.7rem] leading-[1.3] text-center select-none"
+        style={{ textShadow: '0 0 20px rgba(0,255,136,0.4)', overflow: 'visible' }}
+      >{`██╗   ██╗██╗   ██╗███╗   ███╗███╗   ███╗██╗   ██╗
 ╚██╗ ██╔╝██║   ██║████╗ ████║████╗ ████║╚██╗ ██╔╝
- ╚████╔╝ ██║   ██║██╔████╔██║██╔████╔██║ ╚████╔╝
-  ╚██╔╝  ██║   ██║██║╚██╔╝██║██║╚██╔╝██║  ╚██╔╝
-   ██║   ╚██████╔╝██║ ╚═╝ ██║██║ ╚═╝ ██║   ██║
-   ╚═╝    ╚═════╝ ╚═╝     ╚═╝╚═╝     ╚═╝   ╚═╝
-`}</pre>
+ ╚████╔╝ ██║   ██║██╔████╔██║██╔████╔██║ ╚████╔╝ 
+  ╚██╔╝  ██║   ██║██║╚██╔╝██║██║╚██╔╝██║  ╚██╔╝  
+   ██║   ╚██████╔╝██║ ╚═╝ ██║██║ ╚═╝ ██║   ██║   
+   ╚═╝    ╚═════╝ ╚═╝     ╚═╝╚═╝     ╚═╝   ╚═╝   `}</pre>
 
       <div className="text-center text-text-2 text-[0.8rem]">
         <div className="text-green mb-2 text-[0.9rem]">

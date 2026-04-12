@@ -1,5 +1,5 @@
 """
-YUMMY Backend — FastAPI Entry Point
+YUMMY Backend - FastAPI Entry Point
 AI-powered multi-agent SDLC platform for banking/enterprise
 
 Run:
@@ -29,10 +29,10 @@ from routers.utils_router import router as utils_router
 app = FastAPI(
     title="YUMMY API",
     description=(
-        "## ⚡ YUMMY — AI-powered Multi-Agent SDLC Platform\n\n"
+        "## YUMMY - AI-powered Multi-Agent SDLC Platform\n\n"
         "**Agent Pipeline:** BA → SA → Dev Lead → DEV → Security → QA → SRE\n\n"
         "**Providers:** Gemini 2.5 Flash (cloud) | Ollama (local)\n\n"
-        "Xem `/help` để biết workflow đầy đủ."
+        "See `/help` for the full workflow."
     ),
     version="2.0.0",
     docs_url="/docs",
@@ -41,19 +41,20 @@ app = FastAPI(
 
 # ============================================================
 # CORS MIDDLEWARE
-# Note: Trong production, thay allow_origins=["*"] bằng domain cụ thể
+# Note: In production, replace allow_origins=["*"] with specific domains
 # ============================================================
 
+# TODO: replace with ["http://localhost:3000", "https://yourdomain.com"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # TODO: thay bằng ["http://localhost:3000", "https://yourdomain.com"]
+    allow_origins=["*"],    
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ============================================================
-# REGISTER ROUTERS
+# ROUTERS
 # ============================================================
 
 app.include_router(utils_router)

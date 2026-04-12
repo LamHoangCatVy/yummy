@@ -2,7 +2,7 @@
 YUMMY Backend - SDLC Multi-Agent Workflow Router
 Endpoints: /sdlc/*
 
-AGENT PIPELINE (theo thứ tự):
+AGENT PIPELINE:
 ┌─────────┐    ┌──────┐    ┌────────────┐    ┌─────────┐
 │   BA    │───▶│  SA  │───▶│  DEV LEAD  │───▶│   DEV   │
 │Business │    │System│    │  (review   │    │ (code)  │
@@ -16,7 +16,7 @@ AGENT PIPELINE (theo thứ tự):
                └──────┘
                   │
                ┌──▼───┐
-               │  PM  │ (JIRA backlog - chạy song song với SA)
+               │  PM  │ (JIRA backlog - runs in parallel with SA)
                └──────┘
 
 Workflow states:
@@ -41,96 +41,96 @@ router = APIRouter(prefix="/sdlc", tags=["SDLC Agents"])
 
 AGENT_INSTRUCTIONS = {
     "BA": (
-        "Bạn là Business Analyst (BA) cấp Senior trong dự án phần mềm ngân hàng/enterprise. "
-        "Viết Business Requirements Document (BRD) đầy đủ bao gồm: "
+        "You are a Senior Business Analyst (BA) working on a banking/enterprise software project. "
+        "Write a complete Business Requirements Document (BRD) including: "
         "## 1. Business Context & Problem Statement, "
         "## 2. Functional Requirements (FR), "
         "## 3. Non-Functional Requirements (NFR), "
         "## 4. User Stories (As a ... I want ... So that ...), "
         "## 5. Acceptance Criteria, "
         "## 6. Out of Scope. "
-        "Trình bày Markdown rõ ràng. Không bịa đặt thông tin kỹ thuật."
+        "Use clear Markdown formatting. Do not fabricate technical information."
     ),
 
     "SA": (
-        "Bạn là Solution Architect (SA) cấp Senior. "
-        "Viết System Architecture Document (SAD) bao gồm: "
-        "## 1. High-Level Architecture Diagram (dạng text/mermaid), "
+        "You are a Senior Solution Architect (SA). "
+        "Write a System Architecture Document (SAD) including: "
+        "## 1. High-Level Architecture Diagram (text/mermaid format), "
         "## 2. Component Design, "
         "## 3. API Contracts (endpoints, request/response), "
-        "## 4. Data Model Changes (nếu có), "
+        "## 4. Data Model Changes (if any), "
         "## 5. Integration Points, "
         "## 6. Technology Decisions & Rationale. "
-        "Trình bày Markdown. Bám sát BRD và kiến trúc hiện tại."
+        "Use Markdown formatting. Stay aligned with the BRD and existing architecture."
     ),
 
     "DEV_LEAD": (
-        "Bạn là Tech Lead / Dev Lead cấp Principal Engineer. "
-        "Nhiệm vụ: REVIEW SA Design và tạo Implementation Plan cho team dev. "
-        "Output bao gồm: "
-        "## 1. SA Review & Technical Concerns (những điểm SA chưa rõ hoặc cần clarify), "
+        "You are a Principal Engineer / Tech Lead. "
+        "Your task: REVIEW the SA Design and create an Implementation Plan for the dev team. "
+        "Output must include: "
+        "## 1. SA Review & Technical Concerns (unclear points or items needing clarification), "
         "## 2. Technical Debt & Risks, "
-        "## 3. Implementation Breakdown (chia nhỏ task cho dev), "
-        "## 4. Code Standards & Patterns cần tuân theo, "
+        "## 3. Implementation Breakdown (split tasks for developers), "
+        "## 4. Code Standards & Patterns to follow, "
         "## 5. Testing Strategy (unit/integration/e2e), "
-        "## 6. Definition of Done (DoD) cho từng task. "
-        "Tư duy phản biện, chỉ ra rủi ro kỹ thuật thực tế."
+        "## 6. Definition of Done (DoD) for each task. "
+        "Think critically and highlight real technical risks."
     ),
 
     "DEV": (
-        "Bạn là Senior Developer. "
-        "Dựa trên SA Plan và Dev Lead guidance, viết: "
-        "## 1. Pseudocode / Code Structure cho các thay đổi chính, "
-        "## 2. File/Module nào cần tạo mới hoặc sửa đổi, "
+        "You are a Senior Developer. "
+        "Based on the SA Plan and Dev Lead guidance, write: "
+        "## 1. Pseudocode / Code Structure for the main changes, "
+        "## 2. Files/Modules to create or modify, "
         "## 3. Key Implementation Details (algorithms, patterns), "
-        "## 4. Database Migration scripts (nếu cần), "
-        "## 5. Environment Variables / Config cần thêm. "
-        "Viết code mẫu thực tế (không phải placeholder). "
-        "Markdown với code blocks rõ ràng."
+        "## 4. Database Migration scripts (if needed), "
+        "## 5. Environment Variables / Config to add. "
+        "Write real, practical code samples (not placeholders). "
+        "Use Markdown with clear code blocks."
     ),
 
     "SECURITY": (
-        "Bạn là Security Engineer / AppSec chuyên về banking/enterprise security. "
-        "Thực hiện Security Review toàn diện bao gồm: "
+        "You are a Security Engineer / AppSec specialist in banking/enterprise security. "
+        "Perform a comprehensive Security Review including: "
         "## 1. Threat Modeling (STRIDE: Spoofing/Tampering/Repudiation/Info Disclosure/DoS/Elevation), "
-        "## 2. OWASP Top 10 Checklist (đánh dấu applicable items), "
+        "## 2. OWASP Top 10 Checklist (mark applicable items), "
         "## 3. Authentication & Authorization Review, "
         "## 4. Data Security (PII, encryption at rest/in transit), "
         "## 5. Input Validation & Injection Prevention, "
-        "## 6. API Security (rate limiting, CORS, JWT, v.v.), "
-        "## 7. Compliance Considerations (PCI-DSS, GDPR nếu applicable), "
+        "## 6. API Security (rate limiting, CORS, JWT, etc.), "
+        "## 7. Compliance Considerations (PCI-DSS, GDPR if applicable), "
         "## 8. Security Action Items (CRITICAL / HIGH / MEDIUM / LOW). "
-        "Chỉ ra CVE/CWE cụ thể nếu applicable. Không bỏ qua rủi ro."
+        "Reference specific CVE/CWE where applicable. Do not skip any risks."
     ),
 
     "QA": (
-        "Bạn là QA Engineer / SDET. "
-        "Viết Test Plan đầy đủ bao gồm: "
+        "You are a QA Engineer / SDET. "
+        "Write a complete Test Plan including: "
         "## 1. Test Scope & Strategy, "
         "## 2. Test Cases (Happy Path, Edge Cases, Negative Cases), "
         "## 3. Performance Test Scenarios, "
         "## 4. Regression Test Checklist, "
         "## 5. Test Data Requirements, "
         "## 6. Exit Criteria. "
-        "Format test cases dạng: | ID | Scenario | Steps | Expected | Priority |"
+        "Format test cases as: | ID | Scenario | Steps | Expected | Priority |"
     ),
 
     "SRE": (
-        "Bạn là SRE / DevOps Engineer. "
-        "Tạo Release Package bao gồm: "
+        "You are an SRE / DevOps Engineer. "
+        "Create a Release Package including: "
         "## 1. Release Notes (What's New, Bug Fixes, Breaking Changes), "
         "## 2. Deployment Checklist (step-by-step), "
-        "## 3. Infrastructure Changes (nếu có), "
+        "## 3. Infrastructure Changes (if any), "
         "## 4. Configuration Changes (.env, feature flags), "
-        "## 5. Monitoring & Alerting (metrics cần watch sau deploy), "
-        "## 6. Rollback Plan (steps chi tiết khi cần rollback), "
+        "## 5. Monitoring & Alerting (metrics to watch after deploy), "
+        "## 6. Rollback Plan (detailed steps when rollback is needed), "
         "## 7. Post-Deploy Verification (smoke tests). "
-        "Viết như runbook thực tế, không chung chung."
+        "Write like a real runbook, not generic advice."
     ),
 
     "PM": (
-        'Parse SA Plan và Dev Lead Implementation Plan thành JIRA backlog JSON. '
-        'Chỉ trả về JSON, không thêm bất kỳ text hay markdown wrapper nào. '
+        'Parse the SA Plan and Dev Lead Implementation Plan into a JIRA backlog JSON. '
+        'Return only JSON, no extra text or markdown wrapper. '
         'Format: {"epics": [{"title": "Epic Title", "tasks": [{"title": "Task Title", '
         '"type": "backend|frontend|devops|security|testing", '
         '"story_points": 3, '
@@ -146,18 +146,14 @@ AGENT_INSTRUCTIONS = {
 @router.post("/start")
 async def sdlc_start(req: CRRequest):
     """
-    Bước 1: Khởi động SDLC workflow với Change Request.
-    BA viết BRD → chờ approve.
-    
-    State: idle → waiting_ba_approval
+    Step 1: Start the SDLC workflow with a Change Request.
+    BA writes BRD -> waits for approval.
+
+    State: idle -> waiting_ba_approval
     Next: POST /sdlc/approve-ba
     """
     session = get_session(req.session_id)
     kb = require_knowledge_base()
-
-    if session["workflow_state"] not in ("idle", "done"):
-        # Cho phép restart nếu đã done
-        pass
 
     session["workflow_state"] = "running_ba"
     session["agent_outputs"] = {"requirement": req.requirement}
@@ -168,7 +164,7 @@ async def sdlc_start(req: CRRequest):
         "BA",
         (
             f"CHANGE REQUEST:\n{req.requirement}\n\n"
-            f"KIẾN TRÚC HIỆN TẠI (Project Context):\n{kb['project_summary']}"
+            f"CURRENT ARCHITECTURE (Project Context):\n{kb['project_summary']}"
         ),
         AGENT_INSTRUCTIONS["BA"]
     )
@@ -178,7 +174,7 @@ async def sdlc_start(req: CRRequest):
 
     return {
         "status": "waiting_ba_approval",
-        "message": "✅ BA đã viết BRD. Review và gọi POST /sdlc/approve-ba để tiếp tục.",
+        "message": "BA has written the BRD. Review and call POST /sdlc/approve-ba to continue.",
         "ba_output": ba_result,
         "next_step": "POST /sdlc/approve-ba"
     }
@@ -191,16 +187,15 @@ async def sdlc_start(req: CRRequest):
 @router.post("/approve-ba")
 async def sdlc_approve_ba(req: ApproveRequest):
     """
-    Bước 2: Approve BRD của BA.
-    SA thiết kế kiến trúc → PM tạo JIRA backlog.
-    
-    State: waiting_ba_approval → waiting_sa_approval
+    Step 2: Approve the BA's BRD.
+    SA designs the architecture -> PM creates JIRA backlog.
+
+    State: waiting_ba_approval -> waiting_sa_approval
     Next: POST /sdlc/approve-sa
     """
     session = get_session(req.session_id)
     require_workflow_state(session, "waiting_ba_approval")
 
-    # Cho phép user edit BA output trước khi approve
     if req.edited_content:
         session["agent_outputs"]["ba"] = req.edited_content
     ba_content = session["agent_outputs"]["ba"]
@@ -213,13 +208,13 @@ async def sdlc_approve_ba(req: ApproveRequest):
         "SA",
         (
             f"BUSINESS REQUIREMENTS DOCUMENT:\n{ba_content}\n\n"
-            f"KIẾN TRÚC HIỆN TẠI:\n{kb['project_summary']}"
+            f"CURRENT ARCHITECTURE:\n{kb['project_summary']}"
         ),
         AGENT_INSTRUCTIONS["SA"]
     )
     session["agent_outputs"]["sa"] = sa_result
 
-    # PM — JIRA Backlog (dựa trên SA plan)
+    # PM — JIRA Backlog (based on SA plan)
     pm_result = await call_ai(
         "PM",
         f"SA PLAN:\n{sa_result}",
@@ -237,7 +232,7 @@ async def sdlc_approve_ba(req: ApproveRequest):
 
     return {
         "status": "waiting_sa_approval",
-        "message": "✅ SA đã thiết kế kiến trúc + JIRA backlog. Review và gọi POST /sdlc/approve-sa.",
+        "message": "SA has designed the architecture + JIRA backlog. Review and call POST /sdlc/approve-sa.",
         "sa_output": sa_result,
         "jira_backlog": backlog,
         "next_step": "POST /sdlc/approve-sa"
@@ -245,16 +240,16 @@ async def sdlc_approve_ba(req: ApproveRequest):
 
 
 # ============================================================
-# STEP 3: DEV LEAD — Review SA + tạo Implementation Plan
+# STEP 3: DEV LEAD — Review SA + Create Implementation Plan
 # ============================================================
 
 @router.post("/approve-sa")
 async def sdlc_approve_sa(req: ApproveRequest):
     """
-    Bước 3: Approve SA Design.
-    Dev Lead review SA → tạo Implementation Plan → chờ approve.
-    
-    State: waiting_sa_approval → waiting_dev_lead_approval
+    Step 3: Approve the SA Design.
+    Dev Lead reviews SA -> creates Implementation Plan -> waits for approval.
+
+    State: waiting_sa_approval -> waiting_dev_lead_approval
     Next: POST /sdlc/approve-dev-lead
     """
     session = get_session(req.session_id)
@@ -281,7 +276,7 @@ async def sdlc_approve_sa(req: ApproveRequest):
 
     return {
         "status": "waiting_dev_lead_approval",
-        "message": "✅ Dev Lead đã review SA + tạo Implementation Plan. Gọi POST /sdlc/approve-dev-lead.",
+        "message": "Dev Lead has reviewed SA and created an Implementation Plan. Call POST /sdlc/approve-dev-lead.",
         "dev_lead_output": dev_lead_result,
         "next_step": "POST /sdlc/approve-dev-lead"
     }
@@ -294,13 +289,13 @@ async def sdlc_approve_sa(req: ApproveRequest):
 @router.post("/approve-dev-lead")
 async def sdlc_approve_dev_lead(req: ApproveRequest):
     """
-    Bước 4 (cuối): Approve Dev Lead Implementation Plan.
-    Chạy pipeline: DEV → SECURITY → QA → SRE (tuần tự).
-    
-    State: waiting_dev_lead_approval → done
-    
-    Các agents:
-    - DEV:      Viết pseudocode/code structure
+    Step 4 (final): Approve the Dev Lead Implementation Plan.
+    Runs pipeline: DEV -> SECURITY -> QA -> SRE (sequential).
+
+    State: waiting_dev_lead_approval -> done
+
+    Agents:
+    - DEV:      Writes pseudocode/code structure
     - SECURITY: Security review (OWASP, threat model)
     - QA:       Test plan + test cases
     - SRE:      Deployment plan + rollback
@@ -369,12 +364,12 @@ async def sdlc_approve_dev_lead(req: ApproveRequest):
 
     return {
         "status": "done",
-        "message": "🎉 SDLC Pipeline hoàn tất! Tất cả agents đã chạy xong.",
+        "message": "SDLC Pipeline complete! All agents have finished.",
         "pipeline": {
-            "dev": "✅ Done",
-            "security": "✅ Done",
-            "qa": "✅ Done",
-            "sre": "✅ Done"
+            "dev": "Done",
+            "security": "Done",
+            "qa": "Done",
+            "sre": "Done"
         },
         "dev_output": dev_result,
         "security_output": security_result,
@@ -391,10 +386,10 @@ async def sdlc_approve_dev_lead(req: ApproveRequest):
 @router.get("/{session_id}/state")
 def sdlc_get_state(session_id: str):
     """
-    Xem toàn bộ trạng thái SDLC của session:
-    - workflow_state: bước hiện tại
-    - agent_outputs: output của từng agent
-    - jira_backlog: JIRA epics/tasks từ PM
+    View the full SDLC state of a session:
+    - workflow_state: current step
+    - agent_outputs: output from each agent
+    - jira_backlog: JIRA epics/tasks from PM
     """
     session = get_session(session_id)
     return {
@@ -407,7 +402,7 @@ def sdlc_get_state(session_id: str):
 
 @router.get("/{session_id}/history")
 def sdlc_get_chat_history(session_id: str):
-    """Xem lịch sử chat của session."""
+    """View the chat history of a session."""
     session = get_session(session_id)
     return {
         "session_id": session_id,

@@ -12,18 +12,18 @@ from pydantic import BaseModel, Field
 
 class SetupRequest(BaseModel):
     github_url: str = Field(..., example="https://github.com/owner/repo")
-    token: Optional[str] = Field("", description="GitHub Personal Access Token (optional, để access private repo)")
-    max_scan_limit: Optional[int] = Field(10000, description="Giới hạn số file tối đa khi scan")
+    token: Optional[str] = Field("", description="GitHub Personal Access Token (optional, for private repo access)")
+    max_scan_limit: Optional[int] = Field(10000, description="Maximum number of files to scan")
 
 
 class GeminiConfig(BaseModel):
-    api_key: str = Field(..., description="Gemini API Key từ Google AI Studio")
-    model: Optional[str] = Field(None, description="Gemini model ID (optional, giữ nguyên nếu không truyền)")
+    api_key: Optional[str] = Field("", description="Gemini API Key from Google AI Studio")
+    model: Optional[str] = Field(None, description="Gemini model ID (optional, keeps current if not provided)")
 
 
 class OllamaConfig(BaseModel):
-    base_url: str = Field("http://localhost:11434", description="URL Ollama server local")
-    model: str = Field("llama3", description="Tên model Ollama (llama3, codellama, mistral, ...)")
+    base_url: str = Field("http://localhost:11434", description="Ollama local server URL")
+    model: str = Field("llama3", description="Ollama model name (llama3, codellama, mistral, ...)")
 
 
 class CopilotConfig(BaseModel):
@@ -32,7 +32,22 @@ class CopilotConfig(BaseModel):
 
 
 class ProviderSwitch(BaseModel):
-    provider: str = Field(..., description="'gemini' | 'ollama' | 'copilot'")
+    provider: str = Field(..., description="'gemini' | 'ollama' | 'copilot' | 'openai' | 'bedrock'")
+
+
+class OpenAIConfig(BaseModel):
+    api_key: Optional[str] = Field("", description="OpenAI API key (sk-...)")
+    model: Optional[str] = Field("gpt-4o", description="OpenAI model ID (gpt-4o, gpt-4o-mini, o3, ...)")
+
+
+class BedrockConfig(BaseModel):
+    access_key: Optional[str] = Field("", description="AWS Access Key ID")
+    secret_key: Optional[str] = Field("", description="AWS Secret Access Key")
+    region: Optional[str] = Field("us-east-1", description="AWS region (us-east-1, us-west-2, ...)")
+    model: Optional[str] = Field(
+        "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        description="Bedrock model ID (anthropic.claude-*, amazon.titan-*, meta.llama3-*, ...)"
+    )
 
 
 # ============================================================
@@ -40,7 +55,7 @@ class ProviderSwitch(BaseModel):
 # ============================================================
 
 class NewSessionRequest(BaseModel):
-    name: Optional[str] = Field(None, description="Tên workspace/session")
+    name: Optional[str] = Field(None, description="Workspace/session name")
 
 
 # ============================================================
@@ -50,8 +65,8 @@ class NewSessionRequest(BaseModel):
 class AskRequest(BaseModel):
     session_id: str
     question: str
-    ide_file: Optional[str] = Field("", description="Đường dẫn file đang mở trên IDE Simulator")
-    ide_content: Optional[str] = Field("", description="Nội dung file đang mở trên IDE Simulator")
+    ide_file: Optional[str] = Field("", description="Path of the file currently open in the IDE Simulator")
+    ide_content: Optional[str] = Field("", description="Content of the file currently open in the IDE Simulator")
 
 
 # ============================================================
@@ -60,19 +75,19 @@ class AskRequest(BaseModel):
 
 class CRRequest(BaseModel):
     session_id: str
-    requirement: str = Field(..., description="Change Request / yêu cầu tính năng")
+    requirement: str = Field(..., description="Change Request / feature requirement")
 
 
 class ApproveRequest(BaseModel):
     session_id: str
     edited_content: Optional[str] = Field(
         None,
-        description="Nếu user muốn chỉnh sửa output của agent trước khi approve, truyền vào đây"
+        description="If the user wants to edit the agent output before approving, pass the edited content here"
     )
 
 
 # ============================================================
-# RESPONSE MODELS (dùng cho docs/type hints)
+# RESPONSE MODELS (used for docs/type hints)
 # ============================================================
 
 class AgentOutput(BaseModel):

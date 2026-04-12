@@ -24,7 +24,7 @@ export const api = {
     setOllama: (base_url: string, model: string) =>
       request('/config/ollama', { method: 'POST', body: JSON.stringify({ base_url, model }) }),
 
-    setProvider: (provider: 'gemini' | 'ollama' | 'copilot') =>
+    setProvider: (provider: 'gemini' | 'ollama' | 'copilot' | 'openai' | 'bedrock') =>
       request('/config/provider', { method: 'POST', body: JSON.stringify({ provider }) }),
 
     setup: (github_url: string, token: string, max_scan_limit: number) =>
@@ -35,6 +35,12 @@ export const api = {
 
     setCopilot: (token: string, model?: string) =>
       request('/config/copilot', { method: 'POST', body: JSON.stringify({ token, model }) }),
+
+    setOpenAI: (api_key: string, model?: string) =>
+      request('/config/openai', { method: 'POST', body: JSON.stringify({ api_key, model }) }),
+
+    setBedrock: (access_key: string, secret_key: string, region?: string, model?: string) =>
+      request('/config/bedrock', { method: 'POST', body: JSON.stringify({ access_key, secret_key, region, model }) }),
 
     status: () => request('/config/status'),
   },
@@ -59,8 +65,49 @@ export const api = {
   },
 
   // ── RAG Chat ──────────────────────────────────────────────
+  /**
+   * Streaming ask — returns an async generator that yields text chunks.
+   * Emits special tokens: '[DONE]' and '[TRACE] {...}' at the end.
+   */
+  askStream: async function* (
+    session_id: string,
+    question: string,
+    ide_file?: string,
+    ide_content?: string,
+    free?: boolean,   // true = /btw (no KB required)
+  ): AsyncGenerator<string> {
+    const endpoint = free ? '/ask/free' : '/ask'
+    const res = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({ session_id, question, ide_file, ide_content }),
+    })
+    if (!res.ok || !res.body) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(err.detail || `API Error ${res.status}`)
+    }
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n')
+      buf = lines.pop() ?? ''
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const payload = line.slice(6)
+          yield payload.replace(/\\n/g, '\n')
+        }
+      }
+    }
+  },
+
+  /** Non-streaming fallback */
   ask: (session_id: string, question: string, ide_file?: string, ide_content?: string) =>
-    request('/ask', {
+    request('/ask/sync', {
       method: 'POST',
       body: JSON.stringify({ session_id, question, ide_file, ide_content }),
     }),

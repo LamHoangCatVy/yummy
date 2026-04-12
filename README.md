@@ -1,56 +1,68 @@
-# ⚡ YUMMY — AI-powered SDLC Platform
-
-Monorepo gồm Frontend (Next.js) + Backend (FastAPI).
+# YUMMY - AI-powered SDLC Platform
 
 ```
 yummy/
-├── frontend/     ← Next.js app (port 3000)
-├── backend/      ← FastAPI app (port 8000)
-├── start.sh      ← Chạy cả 2 cùng lúc (Linux/Mac)
-├── start.bat     ← Chạy cả 2 cùng lúc (Windows)
-└── .env          ← Cấu hình chung (copy từ .env.example)
+├── frontend/     - Next.js app (port 3000)
+├── backend/      - FastAPI app (port 8000)
+├── start.bat     - One-command start (Windows CMD / PowerShell)
+├── start.sh      - One-command start (Linux / Mac / Git Bash)
+└── .env.example  - Config template
 ```
 
-## 🚀 Chạy nhanh (1 lệnh)
+---
 
-### Linux / Mac
-```bash
-cp .env.example .env
-# Điền GEMINI_API_KEY vào .env
-chmod +x start.sh
-./start.sh
+## Quick Start
+
+### Windows - CMD or PowerShell (recommended)
 ```
-
-### Windows
-```bat
-copy .env.example .env
-:: Điền GEMINI_API_KEY vào .env
 start.bat
 ```
 
-Mở: http://localhost:3000
+### Windows - Git Bash / Linux / Mac
+```bash
+bash start.sh
+```
+
+On first run the script auto-creates `.env` and asks you to fill in your API key.  
+Get a free Gemini key at: https://aistudio.google.com/app/apikey
+
+Run the same command again after filling in the key — everything else is automatic.
 
 ---
 
-## Cấu hình .env
+## Configuration (.env)
 
-| Biến | Mô tả | Bắt buộc |
-|------|-------|---------|
-| `GEMINI_API_KEY` | Lấy tại https://aistudio.google.com | ✅ (hoặc dùng Ollama) |
-| `AI_PROVIDER` | `gemini` hoặc `ollama` | Mặc định: `gemini` |
-| `GITHUB_TOKEN` | Token để scan private repo | Không bắt buộc |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GEMINI_API_KEY` | Your Gemini API key | required |
+| `AI_PROVIDER` | `gemini` or `ollama` | `gemini` |
+| `OLLAMA_BASE_URL` | Ollama server URL | `http://localhost:11434` |
+| `OLLAMA_MODEL` | Ollama model name | `codellama` |
+| `GITHUB_TOKEN` | For private repo scanning | optional |
+| `BACKEND_PORT` | Backend port | `8000` |
+| `FRONTEND_PORT` | Frontend port | `3000` |
 
 ---
 
-## Chạy thủ công (nếu cần debug riêng)
+## URLs
+
+| Service | URL |
+|---------|-----|
+| App | http://localhost:3000 |
+| API | http://localhost:8000 |
+| Swagger | http://localhost:8000/docs |
+
+---
+
+## Manual Setup (for debugging)
 
 **Backend:**
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --reload --port 8000
 ```
 
 **Frontend:**

@@ -12,12 +12,12 @@ router = APIRouter(tags=["Metrics"])
 @router.get("/metrics")
 def get_metrics():
     """
-    Xem request logs và chi phí AI.
-    
-    Hiển thị:
-    - Tổng số request
-    - Tổng chi phí USD (Gemini pricing)
-    - 50 request gần nhất
+    View request logs and AI costs.
+
+    Returns:
+    - Total number of requests
+    - Total cost in USD (Gemini pricing)
+    - 50 most recent requests
     """
     logs = DB["request_logs"]
     total_cost = round(sum(l["cost"] for l in logs), 6)
@@ -36,12 +36,12 @@ def get_metrics():
         "total_requests": len(logs),
         "total_cost_usd": total_cost,
         "agent_breakdown": agent_stats,
-        "logs": logs[:50]  # 50 gần nhất
+        "logs": logs[:50]  # 50 most recent
     }
 
 
 @router.delete("/metrics")
 def clear_metrics():
-    """Xóa request logs."""
+    """Clear all request logs."""
     DB["request_logs"] = []
-    return {"status": "ok", "message": "Request logs đã được xóa."}
+    return {"status": "ok", "message": "Request logs cleared."}

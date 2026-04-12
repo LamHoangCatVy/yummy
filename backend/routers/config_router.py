@@ -4,27 +4,21 @@ Endpoints: /config/*
 """
 
 import re
+import os
 from fastapi import APIRouter, HTTPException
 from config import DB, API_CONFIG
-from models import SetupRequest, GeminiConfig, OllamaConfig, CopilotConfig, ProviderSwitch
+from models import SetupRequest, GeminiConfig, OllamaConfig, CopilotConfig, ProviderSwitch, OpenAIConfig, BedrockConfig
 
 router = APIRouter(prefix="/config", tags=["Config"])
 
 
 @router.post("/api-key")
 def set_api_key(cfg: GeminiConfig):
-    """
-    Set Gemini API key (và tuỳ chọn model) tại runtime.
-    Lấy key tại: https://aistudio.google.com/app/apikey
-    """
-    API_CONFIG["gemini_key"] = cfg.api_key
+    if cfg.api_key:
+        API_CONFIG["gemini_key"] = cfg.api_key
     if cfg.model:
         API_CONFIG["gemini_model"] = cfg.model
-    return {
-        "status": "ok",
-        "message": "Gemini config đã được cấu hình.",
-        "model": API_CONFIG["gemini_model"],
-    }
+    return {"status": "ok", "model": API_CONFIG["gemini_model"]}
 
 
 @router.post("/ollama")
@@ -51,37 +45,49 @@ def set_ollama_config(cfg: OllamaConfig):
 @router.post("/provider")
 def switch_provider(req: ProviderSwitch):
     """
-    Switch AI provider giữa 'gemini' và 'ollama'.
+    Switch AI provider.
     
-    - gemini: dùng Gemini 2.5 Flash (cloud, cần API key, có cost)
-    - ollama: dùng model local (miễn phí, chậm hơn, cần ollama serve)
+    - gemini:  Google Gemini (cloud, needs API key)
+    - ollama:  Local Ollama (free, needs ollama serve)
+    - copilot: GitHub Copilot (needs GH token)
+    - openai:  OpenAI (cloud, needs API key)
+    - bedrock: AWS Bedrock (cloud, needs AWS credentials)
     """
-    if req.provider not in ("gemini", "ollama", "copilot"):
-        raise HTTPException(400, "Provider phải là 'gemini', 'ollama' hoặc 'copilot'.")
+    if req.provider not in ("gemini", "ollama", "copilot", "openai", "bedrock"):
+        raise HTTPException(400, "Provider must be one of: gemini, ollama, copilot, openai, bedrock.")
     API_CONFIG["provider"] = req.provider
     return {"status": "ok", "provider": req.provider}
 
 
+@router.post("/openai")
+def set_openai_config(cfg: OpenAIConfig):
+    if cfg.api_key:
+        API_CONFIG["openai_key"] = cfg.api_key
+    if cfg.model:
+        API_CONFIG["openai_model"] = cfg.model
+    return {"status": "ok", "model": API_CONFIG["openai_model"]}
+
+
+@router.post("/bedrock")
+def set_bedrock_config(cfg: BedrockConfig):
+    if cfg.access_key:
+        API_CONFIG["bedrock_access_key"] = cfg.access_key
+    if cfg.secret_key:
+        API_CONFIG["bedrock_secret_key"] = cfg.secret_key
+    if cfg.region:
+        API_CONFIG["bedrock_region"] = cfg.region
+    if cfg.model:
+        API_CONFIG["bedrock_model"] = cfg.model
+    return {"status": "ok", "region": API_CONFIG["bedrock_region"], "model": API_CONFIG["bedrock_model"]}
+
+
 @router.post("/copilot")
 def set_copilot_config(cfg: CopilotConfig):
-    """
-    Cấu hình GitHub Copilot token và model.
-
-    Token sources (theo thứ tự ưu tiên):
-      - Truyền trực tiếp qua API này
-      - Env: COPILOT_GITHUB_TOKEN, GH_TOKEN, GITHUB_TOKEN
-
-    Models: gpt-4o, gpt-4o-mini, claude-sonnet-4-5, o3-mini, gpt-5, ...
-    Xem đầy đủ: client.list_models() (GitHub Copilot CLI)
-    """
-    API_CONFIG["copilot_token"] = cfg.token
+    if cfg.token:
+        API_CONFIG["copilot_token"] = cfg.token
     if cfg.model:
         API_CONFIG["copilot_model"] = cfg.model
-    return {
-        "status": "ok",
-        "message": "Copilot config đã được cấu hình.",
-        "model": API_CONFIG["copilot_model"],
-    }
+    return {"status": "ok", "model": API_CONFIG["copilot_model"]}
 
 
 @router.post("/setup")
@@ -124,19 +130,45 @@ async def setup_repo(req: SetupRequest):
 @router.get("/status")
 def get_status():
     """
-    Xem toàn bộ trạng thái hệ thống.
-    Dùng để kiểm tra trước khi bắt đầu workflow.
+    View full system status.
+    Keys are NEVER returned — only boolean flags indicating whether they are set,
+    and the source (env = loaded from environment variable, ui = set via API).
     """
+    def _key_source(env_var: str, config_key: str) -> str:
+        """Return 'env' if the value came from an env var, 'ui' if set at runtime, 'none' if missing."""
+        if not API_CONFIG.get(config_key):
+            return "none"
+        if os.getenv(env_var):
+            # Value matches what env would provide — likely from env
+            return "env" if API_CONFIG[config_key] == os.getenv(env_var) else "ui"
+        return "ui"
+
     return {
         "repo": DB.get("repo_info"),
         "ai_provider": API_CONFIG.get("provider", "gemini"),
+        # Gemini
         "has_gemini_key": bool(API_CONFIG.get("gemini_key")),
-        "has_github_token": bool(DB.get("github_token")),
-        "ollama_url": API_CONFIG.get("ollama_base_url") or None,
+        "gemini_key_source": _key_source("GEMINI_API_KEY", "gemini_key"),
         "gemini_model": API_CONFIG.get("gemini_model"),
+        # GitHub
+        "has_github_token": bool(DB.get("github_token")),
+        # Ollama
+        "ollama_url": API_CONFIG.get("ollama_base_url") or None,
         "ollama_model": API_CONFIG.get("ollama_model"),
+        # Copilot
         "has_copilot_token": bool(API_CONFIG.get("copilot_token")),
+        "copilot_key_source": _key_source("COPILOT_GITHUB_TOKEN", "copilot_token"),
         "copilot_model": API_CONFIG.get("copilot_model"),
+        # OpenAI
+        "has_openai_key": bool(API_CONFIG.get("openai_key")),
+        "openai_key_source": _key_source("OPENAI_API_KEY", "openai_key"),
+        "openai_model": API_CONFIG.get("openai_model"),
+        # Bedrock
+        "has_bedrock_key": bool(API_CONFIG.get("bedrock_access_key")),
+        "bedrock_key_source": _key_source("AWS_ACCESS_KEY_ID", "bedrock_access_key"),
+        "bedrock_region": API_CONFIG.get("bedrock_region"),
+        "bedrock_model": API_CONFIG.get("bedrock_model"),
+        # KB
         "kb_files": len(DB["knowledge_base"]["tree"]),
         "kb_insights": len(DB["knowledge_base"]["insights"]),
         "kb_has_summary": bool(DB["knowledge_base"]["project_summary"]),

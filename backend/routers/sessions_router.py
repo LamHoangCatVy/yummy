@@ -14,8 +14,8 @@ router = APIRouter(prefix="/sessions", tags=["Sessions"])
 @router.post("")
 def create_session(req: NewSessionRequest):
     """
-    Tạo workspace/session mới.
-    session_id trả về dùng cho tất cả các request liên quan đến session này.
+    Create a new workspace/session.
+    The returned session_id is used for all subsequent requests related to this session.
     """
     sid = new_session_id()
     name = req.name or f"Session {len(DB['sessions']) + 1}"
@@ -25,7 +25,7 @@ def create_session(req: NewSessionRequest):
 
 @router.get("")
 def list_sessions():
-    """Liệt kê tất cả sessions (tên, id, created_at, workflow_state)."""
+    """List all sessions (name, id, created_at, workflow_state)."""
     return [
         {
             "id": s["id"],
@@ -39,14 +39,14 @@ def list_sessions():
 
 @router.get("/{session_id}")
 def get_session_detail(session_id: str):
-    """Xem chi tiết đầy đủ của một session (logs, chat_history, agent_outputs, ...)."""
+    """Get full details of a session (logs, chat_history, agent_outputs, ...)."""
     return get_session(session_id)
 
 
 @router.delete("/{session_id}")
 def delete_session(session_id: str):
-    """Xóa session."""
-    get_session(session_id)  # Raises 404 nếu không tồn tại
+    """Delete a session."""
+    get_session(session_id)  # Raises 404 if not found
     del DB["sessions"][session_id]
     return {"status": "deleted", "session_id": session_id}
 
@@ -54,11 +54,9 @@ def delete_session(session_id: str):
 @router.post("/{session_id}/reset")
 def reset_session_workflow(session_id: str):
     """
-    Reset workflow state về 'idle' (không xóa chat history).
-    Dùng khi muốn bắt đầu CR mới trong cùng session.
+    Reset workflow state to 'idle' (does not clear chat history).
+    Use this to start a new CR within the same session.
     """
     session = get_session(session_id)
     session["workflow_state"] = "idle"
-    session["agent_outputs"] = {}
-    session["jira_backlog"] = []
-    return {"status": "ok", "message": "Workflow reset về idle."}
+    return {"status": "ok", "workflow_state": "idle"}
