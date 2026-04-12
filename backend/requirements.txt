@@ -4,7 +4,4 @@ httpx==0.27.2
 pydantic>=2.12.0
 python-dotenv==1.0.1
 boto3>=1.34.0
-# Optional providers (comment out if not needed)
-# google-genai
-# openai>=1.30.0
-# github-copilot-sdk
+google-genai
