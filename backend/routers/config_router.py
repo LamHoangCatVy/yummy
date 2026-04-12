@@ -175,5 +175,6 @@ def get_status():
         "total_sessions": len(DB["sessions"]),
         "scan_status": DB.get("scan_status"),
         "total_requests": len(DB["request_logs"]),
-        "total_cost_usd": round(sum(l["cost"] for l in DB["request_logs"]), 5)
+        "total_cost_usd": round(DB.get("total_cost_usd", sum(l["cost"] for l in DB["request_logs"])), 5),
+        "cost_limit_usd": DB.get("cost_limit_usd", 300.0),
     }

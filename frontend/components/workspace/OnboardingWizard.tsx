@@ -79,7 +79,7 @@ const COPILOT_MODELS: ModelOption[] = [
 const PROVIDER_DEFAULT_MODELS: Record<Provider, string> = {
   gemini:  'gemini-2.5-flash',
   openai:  'gpt-5.1',
-  bedrock: 'anthropic.claude-sonnet-4-5-v1:0',
+  bedrock: 'amazon.nova-micro-v1:0',   // cheapest — demo default
   copilot: 'gpt-5.1',
   ollama:  'llama3',
 }
@@ -160,7 +160,7 @@ function ModelSelect({
 
 export default function OnboardingWizard({ onComplete, onScanStart }: OnboardingWizardProps) {
   const [step, setStep] = useState<Step>('provider')
-  const [provider, setProvider] = useState<Provider>('gemini')
+  const [provider, setProvider] = useState<Provider>('bedrock')  // default: cheapest
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -179,7 +179,7 @@ export default function OnboardingWizard({ onComplete, onScanStart }: Onboarding
   const [bedrockModel, setBedrockModel]   = useState(PROVIDER_DEFAULT_MODELS.bedrock)
 
   // Repo
-  const [repoUrl, setRepoUrl]         = useState('')
+  const [repoUrl, setRepoUrl]         = useState('https://github.com/your-org/yummy')
   const [githubToken, setGithubToken] = useState('')
 
   const meta = PROVIDERS.find(p => p.id === provider)!
@@ -419,7 +419,9 @@ export default function OnboardingWizard({ onComplete, onScanStart }: Onboarding
             <>
               <div>
                 <p className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>Connect your GitHub repo</p>
-                <p className="text-xs" style={{ color: 'var(--text-3)' }}>YUMMY will scan and index the codebase so the AI can answer questions about it.</p>
+                <p className="text-xs" style={{ color: 'var(--text-3)' }}>
+                  Try scanning the YUMMY repo itself to see what YUMMY can do — or paste your own repo URL.
+                </p>
               </div>
               <label className="flex flex-col gap-1">
                 <span className="text-xs" style={{ color: 'var(--text-3)' }}>Repository URL</span>

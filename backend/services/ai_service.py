@@ -127,14 +127,23 @@ def _track(
         "cost": round(cost, 6),
     })
 
+    # Accumulate total cost
+    DB["total_cost_usd"] = round(DB.get("total_cost_usd", 0.0) + cost, 6)
+
 
 # ─── Public: blocking call ────────────────────────────────────────────────────
 
 async def call_ai(agent_role: str, prompt: str, instruction: str) -> str:
-    """
-    Blocking AI call. Selects provider from API_CONFIG["provider"].
-    Tracks token usage and cost in DB["request_logs"].
-    """
+    """Blocking AI call. Checks cost limit before proceeding."""
+    limit = DB.get("cost_limit_usd", 300.0)
+    spent = DB.get("total_cost_usd", 0.0)
+    if spent >= limit:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=402,
+            detail=f"Demo credit limit of ${limit:.0f} reached (spent ${spent:.2f}). Contact the admin to continue.",
+        )
+
     provider = API_CONFIG.get("provider", "gemini")
     start = time.time()
     in_tokens = out_tokens = None

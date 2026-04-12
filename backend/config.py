@@ -38,8 +38,10 @@ DB: Dict[str, Any] = {
     "repo_info": None,
     "github_token": "",
     "request_logs": [],
-    "scan_status": None,   # None | { text, progress, running }
-    "max_scan_limit": 10000,
+    "scan_status": None,
+    "max_scan_limit": 100,          # demo limit — 100 files
+    "total_cost_usd": 0.0,          # running cost tracker
+    "cost_limit_usd": 300.0,        # hard cap — stop when exceeded
 }
 
 # ============================================================
@@ -53,13 +55,12 @@ API_CONFIG: Dict[str, str] = {
     "ollama_model": os.getenv("OLLAMA_MODEL", "llama3"),
     "copilot_token": os.getenv("COPILOT_GITHUB_TOKEN", os.getenv("GH_TOKEN", os.getenv("GITHUB_TOKEN", ""))),
     "copilot_model": os.getenv("COPILOT_MODEL", "gpt-4o"),
-    # OpenAI
     "openai_key": os.getenv("OPENAI_API_KEY", ""),
     "openai_model": os.getenv("OPENAI_MODEL", "gpt-5-nano"),
-    # AWS Bedrock
+    # AWS Bedrock — default provider for demo (cheapest: Nova Micro $0.035/1M)
     "bedrock_access_key": os.getenv("AWS_ACCESS_KEY_ID", ""),
     "bedrock_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY", ""),
     "bedrock_region": os.getenv("AWS_REGION", "us-east-1"),
-    "bedrock_model": os.getenv("BEDROCK_MODEL", "anthropic.claude-3-5-sonnet-20241022-v2:0"),
-    "provider": os.getenv("AI_PROVIDER", "gemini"),  # "gemini" | "ollama" | "copilot" | "openai" | "bedrock"
+    "bedrock_model": os.getenv("BEDROCK_MODEL", "amazon.nova-micro-v1:0"),
+    "provider": os.getenv("AI_PROVIDER", "bedrock"),
 }
