@@ -6,7 +6,7 @@ Endpoints: /config/*
 import re
 from fastapi import APIRouter, HTTPException
 from config import DB, API_CONFIG
-from models import SetupRequest, GeminiConfig, OllamaConfig, ProviderSwitch
+from models import SetupRequest, GeminiConfig, OllamaConfig, CopilotConfig, ProviderSwitch
 
 router = APIRouter(prefix="/config", tags=["Config"])
 
@@ -56,10 +56,32 @@ def switch_provider(req: ProviderSwitch):
     - gemini: dùng Gemini 2.5 Flash (cloud, cần API key, có cost)
     - ollama: dùng model local (miễn phí, chậm hơn, cần ollama serve)
     """
-    if req.provider not in ("gemini", "ollama"):
-        raise HTTPException(400, "Provider phải là 'gemini' hoặc 'ollama'.")
+    if req.provider not in ("gemini", "ollama", "copilot"):
+        raise HTTPException(400, "Provider phải là 'gemini', 'ollama' hoặc 'copilot'.")
     API_CONFIG["provider"] = req.provider
     return {"status": "ok", "provider": req.provider}
+
+
+@router.post("/copilot")
+def set_copilot_config(cfg: CopilotConfig):
+    """
+    Cấu hình GitHub Copilot token và model.
+
+    Token sources (theo thứ tự ưu tiên):
+      - Truyền trực tiếp qua API này
+      - Env: COPILOT_GITHUB_TOKEN, GH_TOKEN, GITHUB_TOKEN
+
+    Models: gpt-4o, gpt-4o-mini, claude-sonnet-4-5, o3-mini, gpt-5, ...
+    Xem đầy đủ: client.list_models() (GitHub Copilot CLI)
+    """
+    API_CONFIG["copilot_token"] = cfg.token
+    if cfg.model:
+        API_CONFIG["copilot_model"] = cfg.model
+    return {
+        "status": "ok",
+        "message": "Copilot config đã được cấu hình.",
+        "model": API_CONFIG["copilot_model"],
+    }
 
 
 @router.post("/setup")
@@ -113,6 +135,8 @@ def get_status():
         "ollama_url": API_CONFIG.get("ollama_base_url") or None,
         "gemini_model": API_CONFIG.get("gemini_model"),
         "ollama_model": API_CONFIG.get("ollama_model"),
+        "has_copilot_token": bool(API_CONFIG.get("copilot_token")),
+        "copilot_model": API_CONFIG.get("copilot_model"),
         "kb_files": len(DB["knowledge_base"]["tree"]),
         "kb_insights": len(DB["knowledge_base"]["insights"]),
         "kb_has_summary": bool(DB["knowledge_base"]["project_summary"]),

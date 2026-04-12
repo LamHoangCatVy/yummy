@@ -26,8 +26,13 @@ class OllamaConfig(BaseModel):
     model: str = Field("llama3", description="Tên model Ollama (llama3, codellama, mistral, ...)")
 
 
+class CopilotConfig(BaseModel):
+    token: str = Field(..., description="GitHub token with Copilot access (COPILOT_GITHUB_TOKEN / GH_TOKEN)")
+    model: Optional[str] = Field("gpt-4o", description="Copilot model ID (gpt-4o, gpt-4o-mini, claude-sonnet-4-5, o3-mini, ...)")
+
+
 class ProviderSwitch(BaseModel):
-    provider: str = Field(..., description="'gemini' hoặc 'ollama'")
+    provider: str = Field(..., description="'gemini' | 'ollama' | 'copilot'")
 
 
 # ============================================================

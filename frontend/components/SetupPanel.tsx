@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { api } from '@/lib/api'
 import type { SystemStatus } from '@/lib/types'
 
+const COPILOT_MODELS = ['gpt-4o', 'gpt-4o-mini', 'gpt-5', 'o3-mini', 'claude-sonnet-4-5', 'claude-opus-4-5']
+
 interface Props {
   status: SystemStatus | null
   onRefresh: () => void
@@ -10,10 +12,12 @@ interface Props {
 
 export default function SetupPanel({ status, onRefresh }: Props) {
   const [tab, setTab] = useState<'ai' | 'github'>('ai')
-  const [provider, setProvider] = useState<'gemini' | 'ollama'>(status?.ai_provider || 'gemini')
+  const [provider, setProvider] = useState<'gemini' | 'ollama' | 'copilot'>(status?.ai_provider || 'gemini')
   const [geminiKey, setGeminiKey] = useState('')
   const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434')
   const [ollamaModel, setOllamaModel] = useState('codellama')
+  const [copilotToken, setCopilotToken] = useState('')
+  const [copilotModel, setCopilotModel] = useState('gpt-4o')
   const [githubUrl, setGithubUrl] = useState('')
   const [githubToken, setGithubToken] = useState('')
   const [maxFiles, setMaxFiles] = useState('100')
@@ -31,6 +35,9 @@ export default function SetupPanel({ status, onRefresh }: Props) {
       if (provider === 'gemini') {
         if (!geminiKey) return flash('err', 'Nhập Gemini API key')
         await api.config.setGeminiKey(geminiKey)
+      } else if (provider === 'copilot') {
+        if (!copilotToken) return flash('err', 'Nhập GitHub Copilot token')
+        await api.config.setCopilot(copilotToken, copilotModel)
       } else {
         await api.config.setOllama(ollamaUrl, ollamaModel)
       }
@@ -102,21 +109,25 @@ export default function SetupPanel({ status, onRefresh }: Props) {
         ))}
       </div>
 
-      <div className="flex-1 overflow-auto p-[0.9rem] flex flex-col gap-[0.9rem]">
+      <div className="overflow-auto p-[0.9rem] flex flex-col gap-[0.9rem]">
 
         {tab === 'ai' && (
           <>
             {row('Provider', (
               <div className="flex gap-2">
-                {(['gemini', 'ollama'] as const).map(p => (
-                  <button key={p} onClick={() => setProvider(p)} className={`btn flex-1 ${provider === p ? 'btn-primary' : 'btn-ghost'}`}>
-                    {p === 'gemini' ? '☁ Gemini' : '🦙 Ollama'}
+                {([
+                  { id: 'gemini', label: '☁ Gemini' },
+                  { id: 'ollama', label: '🦙 Ollama' },
+                  { id: 'copilot', label: '🤖 Copilot' },
+                ] as const).map(p => (
+                  <button key={p.id} onClick={() => setProvider(p.id)} className={`btn flex-1 ${provider === p.id ? 'btn-primary' : 'btn-ghost'}`}>
+                    {p.label}
                   </button>
                 ))}
               </div>
             ))}
 
-            {provider === 'gemini' ? (
+            {provider === 'gemini' && (
               <>
                 {row('Gemini API Key', (
                   <input
@@ -136,7 +147,9 @@ export default function SetupPanel({ status, onRefresh }: Props) {
                   <br />Model: Gemini 2.5 Flash · ~$0.075/1M tokens in
                 </div>
               </>
-            ) : (
+            )}
+
+            {provider === 'ollama' && (
               <>
                 {row('Ollama Base URL', (
                   <input className="input" value={ollamaUrl} onChange={e => setOllamaUrl(e.target.value)} />
@@ -155,6 +168,32 @@ export default function SetupPanel({ status, onRefresh }: Props) {
                   {['brew install ollama (Mac)', 'ollama serve', `ollama pull ${ollamaModel}`].map(cmd => (
                     <div key={cmd} className="text-green font-mono">$ {cmd}</div>
                   ))}
+                </div>
+              </>
+            )}
+
+            {provider === 'copilot' && (
+              <>
+                {row('GitHub Token', (
+                  <input
+                    className="input"
+                    type="password"
+                    placeholder="github_pat_... or ghp_..."
+                    value={copilotToken}
+                    onChange={e => setCopilotToken(e.target.value)}
+                  />
+                ))}
+                {row('Model', (
+                  <select className="input cursor-pointer" value={copilotModel} onChange={e => setCopilotModel(e.target.value)}>
+                    {COPILOT_MODELS.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                ))}
+                <div className="text-xs text-text-3 leading-[1.7] bg-bg-2 p-[0.6rem] rounded border border-border">
+                  <div className="text-[#64a0ff] mb-[0.3rem]">GitHub Copilot requirements:</div>
+                  <div>· Active GitHub Copilot subscription</div>
+                  <div>· Token scopes: <span className="text-green font-mono">read:user</span></div>
                 </div>
               </>
             )}

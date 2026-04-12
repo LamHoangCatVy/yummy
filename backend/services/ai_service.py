@@ -9,7 +9,9 @@ Chọn provider qua:
   - Runtime: POST /config/provider
 """
 
+import os
 import time
+import asyncio
 import httpx
 from datetime import datetime
 from fastapi import HTTPException
@@ -156,6 +158,69 @@ async def _call_ollama(agent_role: str, prompt: str, instruction: str) -> str:
 
 
 # ============================================================
+# COPILOT CALL (GitHub Copilot SDK)
+# ============================================================
+
+async def _call_copilot(agent_role: str, prompt: str, instruction: str) -> str:
+    """Gọi GitHub Copilot qua github-copilot-sdk (event-driven async)."""
+    token = API_CONFIG.get("copilot_token", "")
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "GitHub Copilot token chưa được cấu hình. "
+                "Dùng POST /config/copilot hoặc set env COPILOT_GITHUB_TOKEN."
+            )
+        )
+
+    model = API_CONFIG.get("copilot_model", "gpt-4o")
+
+    try:
+        from copilot import CopilotClient
+        from copilot.session import PermissionHandler
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="github-copilot-sdk chưa được cài. Chạy: pip install github-copilot-sdk",
+        )
+
+    # SDK picks up the token from this env var
+    os.environ["COPILOT_GITHUB_TOKEN"] = token
+
+    result_parts: list[str] = []
+    done = asyncio.Event()
+
+    start = time.time()
+    try:
+        async with CopilotClient() as client:
+            async with await client.create_session(
+                on_permission_request=PermissionHandler.approve_all,
+                model=model,
+                system_message={"role": "system", "content": instruction},
+            ) as session:
+
+                def on_event(event):
+                    ev_type = event.type.value if hasattr(event.type, "value") else str(event.type)
+                    if ev_type == "assistant.message":
+                        result_parts.append(event.data.content or "")
+                    elif ev_type == "session.idle":
+                        done.set()
+
+                session.on(on_event)
+                await session.send(prompt)
+                await asyncio.wait_for(done.wait(), timeout=120)
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Copilot session timed out after 120s.")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Copilot SDK Error: {e}")
+
+    latency = time.time() - start
+    result_text = "".join(result_parts)
+    _track_request(agent_role, prompt, instruction, result_text, latency)
+    return result_text
+
+
+# ============================================================
 # PUBLIC API: call_ai()
 # ============================================================
 
@@ -175,5 +240,7 @@ async def call_ai(agent_role: str, prompt: str, instruction: str) -> str:
 
     if provider == "ollama":
         return await _call_ollama(agent_role, prompt, instruction)
+    elif provider == "copilot":
+        return await _call_copilot(agent_role, prompt, instruction)
     else:
         return await _call_gemini(agent_role, prompt, instruction)

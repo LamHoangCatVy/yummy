@@ -60,6 +60,38 @@ async def health_model():
             latency = round((time.time() - start) * 1000)
             return {"status": "error", "provider": "gemini", "model": model, "latency_ms": latency, "error": str(e)}
 
+    elif provider == "copilot":
+        import os, asyncio
+        token = API_CONFIG.get("copilot_token", "")
+        model = API_CONFIG.get("copilot_model", "gpt-4o")
+        if not token:
+            return {"status": "error", "provider": "copilot", "model": model, "error": "Copilot token not configured."}
+        try:
+            from copilot import CopilotClient
+            from copilot.session import PermissionHandler
+            os.environ["COPILOT_GITHUB_TOKEN"] = token
+            result_parts: list[str] = []
+            done = asyncio.Event()
+            async with CopilotClient() as client:
+                async with await client.create_session(
+                    on_permission_request=PermissionHandler.approve_all,
+                    model=model,
+                ) as session:
+                    def on_event(event):
+                        ev = event.type.value if hasattr(event.type, "value") else str(event.type)
+                        if ev in ("assistant.message", "session.idle"):
+                            done.set()
+                    session.on(on_event)
+                    await session.send("ping")
+                    await asyncio.wait_for(done.wait(), timeout=15)
+            latency = round((time.time() - start) * 1000)
+            return {"status": "ok", "provider": "copilot", "model": model, "latency_ms": latency}
+        except asyncio.TimeoutError:
+            return {"status": "error", "provider": "copilot", "model": model, "error": "Timeout — check token/network."}
+        except Exception as e:
+            latency = round((time.time() - start) * 1000)
+            return {"status": "error", "provider": "copilot", "model": model, "latency_ms": latency, "error": str(e)}
+
     else:  # ollama
         base_url = API_CONFIG.get("ollama_base_url", "http://localhost:11434")
         model = API_CONFIG.get("ollama_model", "llama3")
