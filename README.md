@@ -54,6 +54,13 @@ Run the same command again after filling in the key — everything else is autom
 
 ---
 
+## Product Requirements Backlog
+
+- Full user-story backlog (500 stories, epic/story/task/subtask + Gherkin): `requirements/README.md`
+- Structure follows a template-style format with table of contents and story ranges (`US-001` to `US-500`).
+
+---
+
 ## Manual Setup (for debugging)
 
 **Backend:**
