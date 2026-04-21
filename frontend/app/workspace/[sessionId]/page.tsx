@@ -58,9 +58,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ sessionId:
     { role: 'system', text: '⚡ YUMMY — type /help to see commands.' },
   ])
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
-  const [cmd,  setCmd]  = useState('')
   const [busy, setBusy] = useState(false)
-  const [suggestionIdx, setSuggestionIdx] = useState(0)
 
   // ── IDE ──────────────────────────────────────────────────────────────────────
   const [ideFile,    setIdeFile]    = useState('')
@@ -166,7 +164,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ sessionId:
 
   // ─── IDE file open ───────────────────────────────────────────────────────────
 
-  const openFile = async (path: string) => {
+  const openFile = useCallback(async (path: string) => {
     setIdeFile(path); setRightTab('ide'); setIdeLoading(true); setIdeContent('')
     try {
       const res = await api.kb.file(path) as any
@@ -174,7 +172,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ sessionId:
     } catch (e: any) {
       setIdeContent(`// [ERROR LOADING FILE]: ${e.message}`)
     } finally { setIdeLoading(false) }
-  }
+  }, [])
 
   // ─── Toast ───────────────────────────────────────────────────────────────────
 
@@ -222,6 +220,27 @@ export default function WorkspacePage({ params }: { params: Promise<{ sessionId:
     setRightTab('rag')
 
     let accumulated = ''
+    let lastFlushed = ''
+    let flushTimer: ReturnType<typeof setTimeout> | null = null
+
+    const flushAssistant = (force = false) => {
+      if (!force && accumulated === lastFlushed) return
+      lastFlushed = accumulated
+      setChatHistory(prev => {
+        const next = [...prev]
+        next[next.length - 1] = { role: 'assistant', text: accumulated }
+        return next
+      })
+    }
+
+    const scheduleFlush = () => {
+      if (flushTimer) return
+      flushTimer = setTimeout(() => {
+        flushTimer = null
+        flushAssistant()
+      }, 60)
+    }
+
     try {
       for await (const chunk of api.askStream(
         sessionId, question,
@@ -251,11 +270,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ sessionId:
           continue
         }
         accumulated += chunk
-        setChatHistory(prev => {
-          const next = [...prev]
-          next[next.length - 1] = { role: 'assistant', text: accumulated }
-          return next
-        })
+        scheduleFlush()
       }
     } catch (e: any) {
       setChatHistory(prev => {
@@ -264,6 +279,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ sessionId:
         return next
       })
     } finally {
+      if (flushTimer) clearTimeout(flushTimer)
+      flushAssistant(true)
       setBusy(false)
     }
   }
@@ -287,10 +304,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ sessionId:
 
   // ─── Command handler ─────────────────────────────────────────────────────────
 
-  const handleCmd = async (force?: string) => {
-    const raw = (force || cmd).trim()
+  const handleCmd = async (rawInput: string) => {
+    const raw = rawInput.trim()
     if (!raw || busy) return
-    setCmd('')
     print(`> ${raw}`, 'user')
     const args    = raw.split(' ')
     const command = args[0].toLowerCase()
@@ -551,12 +567,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ sessionId:
               chatHistory={chatHistory}
               scanStatus={scanStatus}
               busy={busy}
-              cmd={cmd}
-              suggestionIdx={suggestionIdx}
               termRef={termRef}
               currentProvider={(status?.ai_provider ?? 'gemini') as any}
-              onCmdChange={setCmd}
-              onSuggestionIdx={setSuggestionIdx}
               onSubmit={handleCmd}
               onProviderSaved={fetchStatus}
             />

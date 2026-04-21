@@ -3,10 +3,13 @@
 # YUMMY - Start both Frontend + Backend with a single command
 # Works on: Linux, Mac, Windows Git Bash
 # Usage: bash start.sh
+#
+# Backend: TypeScript / Hono (backend-ts/). The legacy Python
+# backend (backend/) is kept as a fallback but no longer started.
 # ============================================================
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$ROOT_DIR/backend"
+BACKEND_DIR="$ROOT_DIR/backend-ts"
 FRONTEND_DIR="$ROOT_DIR/frontend"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -42,48 +45,49 @@ echo ""
 echo -e "${CYAN}YUMMY - AI SDLC Platform${NC}"
 echo "=================================="
 
-# ── Detect Python ──────────────────────────────────────────
-PYTHON=""
-for cmd in python3 python python3.13 python3.12; do
-  if command -v "$cmd" &>/dev/null; then
-    PYTHON="$cmd"
-    break
-  fi
-done
-if [ -z "$PYTHON" ]; then
-  echo -e "${RED}ERROR: Python not found. Install Python 3.10+ and try again.${NC}"
+# ── Detect Node ────────────────────────────────────────────
+if ! command -v node &>/dev/null; then
+  echo -e "${RED}ERROR: Node.js not found. Install Node 20+ from https://nodejs.org${NC}"
   exit 1
 fi
-echo -e "${GREEN}Using Python: $(command -v $PYTHON)${NC}"
 
-# ── Backend ────────────────────────────────────────────────
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
+if [ "$NODE_MAJOR" -lt 20 ]; then
+  echo -e "${RED}ERROR: Node 20+ required (found $(node -v)).${NC}"
+  exit 1
+fi
+echo -e "${GREEN}Using Node: $(node -v)${NC}"
+
+# ── Detect / install pnpm ──────────────────────────────────
+if ! command -v pnpm &>/dev/null; then
+  echo -e "${YELLOW}pnpm not found. Installing via 'npm install -g pnpm'...${NC}"
+  npm install -g pnpm
+  if [ $? -ne 0 ]; then
+    echo -e "${RED}ERROR: Failed to install pnpm.${NC}"
+    exit 1
+  fi
+fi
+echo -e "${GREEN}Using pnpm: $(pnpm -v)${NC}"
+
+# ── Backend (TypeScript / Hono) ────────────────────────────
 echo -e "\n${YELLOW}[Backend] Setting up...${NC}"
 cd "$BACKEND_DIR"
 
-if [ ! -d "venv" ]; then
-  $PYTHON -m venv venv
-  echo -e "${GREEN}[Backend] venv created${NC}"
-fi
-
-# Activate - Windows Git Bash uses Scripts/, Unix uses bin/
-if [ -f "venv/Scripts/activate" ]; then
-  source venv/Scripts/activate
-elif [ -f "venv/bin/activate" ]; then
-  source venv/bin/activate
-else
-  echo -e "${RED}ERROR: venv activation script not found.${NC}"
-  exit 1
-fi
-
-pip install -r requirements.txt -q
-if [ $? -ne 0 ]; then
-  echo -e "${RED}[Backend] ERROR: pip install failed.${NC}"
-  exit 1
+if [ ! -d "node_modules" ]; then
+  echo -e "${YELLOW}[Backend] Installing dependencies (first run)...${NC}"
+  pnpm install --silent
+  if [ $? -ne 0 ]; then
+    echo -e "${RED}[Backend] ERROR: pnpm install failed.${NC}"
+    exit 1
+  fi
 fi
 echo -e "${GREEN}[Backend] Dependencies OK${NC}"
 
+# Apply DB migrations (idempotent)
+pnpm db:migrate >/dev/null 2>&1 || true
+
 echo -e "${YELLOW}[Backend] Starting at http://localhost:$BACKEND_PORT ...${NC}"
-python -m uvicorn main:app --reload --port "$BACKEND_PORT" --log-level warning &
+PORT="$BACKEND_PORT" pnpm dev &
 BACKEND_PID=$!
 
 # ── Frontend ───────────────────────────────────────────────

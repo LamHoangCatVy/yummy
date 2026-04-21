@@ -5,7 +5,9 @@ REM Usage: start.bat
 setlocal enabledelayedexpansion
 
 set "ROOT_DIR=%~dp0"
-set "BACKEND_DIR=%ROOT_DIR%backend"
+REM Backend now uses TypeScript / Hono (backend-ts/). Legacy Python
+REM backend (backend/) is kept as a fallback but no longer started.
+set "BACKEND_DIR=%ROOT_DIR%backend-ts"
 set "FRONTEND_DIR=%ROOT_DIR%frontend"
 
 REM Auto-create .env from .env.example if missing
@@ -84,35 +86,45 @@ echo.
 echo Provider set to: !AI_PROVIDER!
 echo ==================================
 
-REM Backend
+REM Backend (TypeScript / Hono)
 echo.
-echo [Backend] Setting up Python venv...
+echo [Backend] Setting up Node.js / pnpm...
 cd /d "%BACKEND_DIR%"
 
-if not exist "venv" (
-    py -3.12 -m venv venv
-    if errorlevel 1 (
-        python -m venv venv
-        if errorlevel 1 (
-            echo [Backend] ERROR: Python not found. Install Python 3.10+ from https://python.org
-            pause
-            exit /b 1
-        )
-    )
-    echo [Backend] venv created
-)
-
-call venv\Scripts\activate.bat
-pip install -r requirements.txt -q
+where node >nul 2>&1
 if errorlevel 1 (
-    echo [Backend] ERROR: pip install failed.
+    echo [Backend] ERROR: Node.js not found. Install Node 20+ from https://nodejs.org
     pause
     exit /b 1
 )
+
+where pnpm >nul 2>&1
+if errorlevel 1 (
+    echo [Backend] pnpm not found. Installing via npm...
+    call npm install -g pnpm
+    if errorlevel 1 (
+        echo [Backend] ERROR: Failed to install pnpm.
+        pause
+        exit /b 1
+    )
+)
+
+if not exist "node_modules" (
+    echo [Backend] Installing dependencies ^(first run^)...
+    call pnpm install --silent
+    if errorlevel 1 (
+        echo [Backend] ERROR: pnpm install failed.
+        pause
+        exit /b 1
+    )
+)
 echo [Backend] Dependencies OK
 
+REM Apply DB migrations (idempotent)
+call pnpm db:migrate >nul 2>&1
+
 echo [Backend] Starting at http://localhost:!BACKEND_PORT! ...
-start "YUMMY Backend" cmd /c "cd /d "!BACKEND_DIR!" && call venv\Scripts\activate.bat && set AI_PROVIDER=!AI_PROVIDER! && set GEMINI_API_KEY=!GEMINI_API_KEY! && set GEMINI_MODEL=!GEMINI_MODEL! && set OPENAI_API_KEY=!OPENAI_API_KEY! && set OPENAI_MODEL=!OPENAI_MODEL! && set AWS_ACCESS_KEY_ID=!AWS_ACCESS_KEY_ID! && set AWS_SECRET_ACCESS_KEY=!AWS_SECRET_ACCESS_KEY! && set AWS_REGION=!AWS_REGION! && set BEDROCK_MODEL=!BEDROCK_MODEL! && set COPILOT_GITHUB_TOKEN=!COPILOT_GITHUB_TOKEN! && set COPILOT_MODEL=!COPILOT_MODEL! && set OLLAMA_BASE_URL=!OLLAMA_BASE_URL! && set OLLAMA_MODEL=!OLLAMA_MODEL! && uvicorn main:app --port !BACKEND_PORT!"
+start "YUMMY Backend" cmd /c "cd /d "!BACKEND_DIR!" && set PORT=!BACKEND_PORT! && set AI_PROVIDER=!AI_PROVIDER! && set GEMINI_API_KEY=!GEMINI_API_KEY! && set GEMINI_MODEL=!GEMINI_MODEL! && set OPENAI_API_KEY=!OPENAI_API_KEY! && set OPENAI_MODEL=!OPENAI_MODEL! && set AWS_ACCESS_KEY_ID=!AWS_ACCESS_KEY_ID! && set AWS_SECRET_ACCESS_KEY=!AWS_SECRET_ACCESS_KEY! && set AWS_REGION=!AWS_REGION! && set BEDROCK_MODEL=!BEDROCK_MODEL! && set COPILOT_GITHUB_TOKEN=!COPILOT_GITHUB_TOKEN! && set COPILOT_MODEL=!COPILOT_MODEL! && set OLLAMA_BASE_URL=!OLLAMA_BASE_URL! && set OLLAMA_MODEL=!OLLAMA_MODEL! && pnpm dev"
 
 timeout /t 3 /nobreak >nul
 

@@ -32,6 +32,10 @@ Get a free Gemini key at: [https://aistudio.google.com/app/apikey](https://aistu
 
 Run the same command again after filling in the key — everything else is automatic.
 
+Requirements:
+- **Node.js 20+** (https://nodejs.org)
+- **pnpm** (auto-installed by the start scripts if missing)
+
 ---
 
 ## Configuration (.env)
@@ -80,16 +84,22 @@ AWS (fastest path, no Docker needed): [docs/aws/APP_RUNNER_AMPLIFY.md](docs/aws/
 
 ---
 
+## Product Requirements Backlog
+
+- Full user-story backlog (500 stories, epic/story/task/subtask + Gherkin): `requirements/README.md`
+- Structure follows a template-style format with table of contents and story ranges (`US-001` to `US-500`).
+
+---
+
 ## Manual Setup (for debugging)
 
 **Backend:**
 
 ```bash
-cd backend
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-python -m uvicorn main:app --reload --port 8000
+cd backend-ts
+pnpm install
+pnpm db:migrate
+pnpm dev               # http://localhost:8000  (docs at /docs)
 ```
 
 **Frontend:**

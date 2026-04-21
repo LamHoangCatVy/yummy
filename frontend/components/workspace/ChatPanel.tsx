@@ -5,6 +5,50 @@ import { mdToHtml } from '@/lib/mdToHtml'
 import { api } from '@/lib/api'
 import type { ChatMessage, ScanStatus } from '@/lib/types'
 
+const TermLogRow = React.memo(function TermLogRow({ role, text }: { role: string; text: string }) {
+  return (
+    <div className="flex gap-2" style={{ color: role === 'user' ? 'var(--green)' : 'var(--text-2)' }}>
+      <span className="flex-shrink-0 mt-0.5" style={{ color: 'var(--text-3)' }}>{role === 'user' ? '❯' : '⚡'}</span>
+      <span className="whitespace-pre-wrap">{text}</span>
+    </div>
+  )
+})
+
+const ChatMessageRow = React.memo(function ChatMessageRow({ message }: { message: ChatMessage }) {
+  const html = React.useMemo(() => {
+    if (message.role === 'user') return ''
+    return mdToHtml(message.text)
+  }, [message.role, message.text])
+
+  return (
+    <div className="flex gap-2" style={{ color: message.role === 'user' ? 'var(--green)' : 'var(--text)' }}>
+      <span className="flex-shrink-0 mt-0.5" style={{ color: 'var(--text-3)' }}>{message.role === 'user' ? '❯' : '🤖'}</span>
+      {message.role === 'user' ? (
+        <span className="font-semibold">{message.text}</span>
+      ) : (
+        <div className="flex-1 border rounded-lg p-3" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+          <div className="prose" dangerouslySetInnerHTML={{ __html: html }} />
+          {message.trace && (
+            <details className="mt-2">
+              <summary className="text-2xs cursor-pointer" style={{ color: 'var(--text-3)' }}>
+                ⬡ RAG trace · {message.trace.source_chunks?.length || 0} chunks
+              </summary>
+              <div className="mt-1.5 p-2 border rounded text-xs" style={{ background: 'var(--bg-1)', borderColor: 'var(--border)', color: 'var(--text-3)' }}>
+                {message.trace.source_chunks?.map((c: any, j: number) => (
+                  <div key={j} className="mb-1.5">
+                    <div style={{ color: 'var(--amber)' }}>{c.files?.slice(0, 3).join(' · ')}</div>
+                    <div>{c.summary_preview || c.summary}</div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+    </div>
+  )
+})
+
 export const COMMANDS = [
   { cmd: '/setup',       args: '<github_url> [token]', desc: 'Configure GitHub repo' },
   { cmd: '/scan',        args: '',                     desc: 'Scan & index codebase' },
@@ -56,23 +100,21 @@ interface ChatPanelProps {
   chatHistory: ChatMessage[]
   scanStatus: ScanStatus | null
   busy: boolean
-  cmd: string
-  suggestionIdx: number
   termRef: React.RefObject<HTMLDivElement | null>
   currentProvider: Provider
-  onCmdChange: (v: string) => void
-  onSuggestionIdx: (i: number) => void
-  onSubmit: (force?: string) => void
+  onSubmit: (raw: string) => void
   onProviderSaved: () => void
 }
 
 export default function ChatPanel({
   sessionName, termLogs, chatHistory, scanStatus, busy,
-  cmd, suggestionIdx, termRef,
+  termRef,
   currentProvider,
-  onCmdChange, onSuggestionIdx, onSubmit, onProviderSaved,
+  onSubmit, onProviderSaved,
 }: ChatPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [cmd, setCmd] = useState('')
+  const [suggestionIdx, setSuggestionIdx] = useState(0)
 
   // API key modal state
   const [keyModal, setKeyModal] = useState(false)
@@ -85,9 +127,18 @@ export default function ChatPanel({
   const isScanning = !!scanStatus?.running
   const isBlocked  = busy || isScanning
 
-  const activeSuggestions = cmd.startsWith('/')
-    ? COMMANDS.filter(c => c.cmd.startsWith(cmd.split(' ')[0]))
-    : []
+  const activeSuggestions = React.useMemo(() => {
+    if (!cmd.startsWith('/')) return []
+    return COMMANDS.filter(c => c.cmd.startsWith(cmd.split(' ')[0]))
+  }, [cmd])
+
+  const submitCmd = (raw: string) => {
+    const trimmed = raw.trim()
+    if (!trimmed) return
+    setCmd('')
+    setSuggestionIdx(0)
+    onSubmit(trimmed)
+  }
 
   // ── Key modal save ────────────────────────────────────────────────────────
   const saveKey = async () => {
@@ -119,18 +170,18 @@ export default function ChatPanel({
     if (activeSuggestions.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        onSuggestionIdx(Math.min(suggestionIdx + 1, activeSuggestions.length - 1))
+        setSuggestionIdx(Math.min(suggestionIdx + 1, activeSuggestions.length - 1))
         return
       }
       if (e.key === 'ArrowUp') {
         e.preventDefault()
-        onSuggestionIdx(Math.max(suggestionIdx - 1, 0))
+        setSuggestionIdx(Math.max(suggestionIdx - 1, 0))
         return
       }
       if (e.key === 'Tab') {
         e.preventDefault()
         const s = activeSuggestions[suggestionIdx]
-        if (!s.args) { onSubmit(s.cmd) } else { onCmdChange(s.cmd + ' ') }
+        if (!s.args) { submitCmd(s.cmd) } else { setCmd(s.cmd + ' ') }
         return
       }
       if (e.key === 'Enter') {
@@ -139,11 +190,11 @@ export default function ChatPanel({
         const parts = cmd.trim().split(' ')
         const hasArgs = parts.length > 1 && parts[1] !== ''
         if (hasArgs) {
-          onSubmit()
+          submitCmd(cmd)
         } else if (!s.args) {
-          onSubmit(s.cmd)
+          submitCmd(s.cmd)
         } else {
-          onCmdChange(s.cmd + ' ')
+          setCmd(s.cmd + ' ')
         }
         return
       }
@@ -156,31 +207,31 @@ export default function ChatPanel({
         setKeyValue(cmd.trim())
         setKeyProvider(currentProvider)
         setKeyModal(true)
-        onCmdChange('')
+        setCmd('')
         return
       }
-      onSubmit()
+      submitCmd(cmd)
     }
-    if (e.key === 'Escape') { onCmdChange(''); onSuggestionIdx(0) }
+    if (e.key === 'Escape') { setCmd(''); setSuggestionIdx(0) }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isBlocked) return
     const v = e.target.value
-    onCmdChange(v)
-    onSuggestionIdx(0)
+    setCmd(v)
+    setSuggestionIdx(0)
     // If user pastes something that looks like a key, open modal immediately
     if (!v.startsWith('/') && looksLikeKey(v)) {
       setKeyValue(v.trim())
       setKeyProvider(currentProvider)
       setKeyModal(true)
-      onCmdChange('')
+      setCmd('')
     }
   }
 
   const selectSuggestion = (s: typeof COMMANDS[number], i: number) => {
-    onSuggestionIdx(i)
-    if (!s.args) { onSubmit(s.cmd) } else { onCmdChange(s.cmd + ' '); inputRef.current?.focus() }
+    setSuggestionIdx(i)
+    if (!s.args) { submitCmd(s.cmd) } else { setCmd(s.cmd + ' '); inputRef.current?.focus() }
   }
 
   const PROVIDER_OPTIONS: Provider[] = ['gemini', 'openai', 'copilot', 'bedrock', 'ollama']
@@ -196,40 +247,8 @@ export default function ChatPanel({
       {/* Message feed — termLogs first, then chatHistory below */}
       <div className="flex-1 overflow-auto p-4 flex flex-col gap-4 text-base leading-relaxed">
 
-        {termLogs.map((log, i) => (
-          <div key={`t${i}`} className="flex gap-2" style={{ color: log.role === 'user' ? 'var(--green)' : 'var(--text-2)' }}>
-            <span className="flex-shrink-0 mt-0.5" style={{ color: 'var(--text-3)' }}>{log.role === 'user' ? '❯' : '⚡'}</span>
-            <span className="whitespace-pre-wrap">{log.text}</span>
-          </div>
-        ))}
-
-        {chatHistory.map((m, i) => (
-          <div key={`c${i}`} className="flex gap-2" style={{ color: m.role === 'user' ? 'var(--green)' : 'var(--text)' }}>
-            <span className="flex-shrink-0 mt-0.5" style={{ color: 'var(--text-3)' }}>{m.role === 'user' ? '❯' : '🤖'}</span>
-            {m.role === 'user' ? (
-              <span className="font-semibold">{m.text}</span>
-            ) : (
-              <div className="flex-1 border rounded-lg p-3" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
-                <div className="prose" dangerouslySetInnerHTML={{ __html: mdToHtml(m.text) }} />
-                {m.trace && (
-                  <details className="mt-2">
-                    <summary className="text-2xs cursor-pointer" style={{ color: 'var(--text-3)' }}>
-                      ⬡ RAG trace · {m.trace.source_chunks?.length || 0} chunks
-                    </summary>
-                    <div className="mt-1.5 p-2 border rounded text-xs" style={{ background: 'var(--bg-1)', borderColor: 'var(--border)', color: 'var(--text-3)' }}>
-                      {m.trace.source_chunks?.map((c: any, j: number) => (
-                        <div key={j} className="mb-1.5">
-                          <div style={{ color: 'var(--amber)' }}>{c.files?.slice(0, 3).join(' · ')}</div>
-                          <div>{c.summary_preview || c.summary}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
+        {termLogs.map((log, i) => <TermLogRow key={`t${i}`} role={log.role} text={log.text} />)}
+        {chatHistory.map((m, i) => <ChatMessageRow key={`c${i}`} message={m} />)}
 
         {/* Busy / scan progress */}
         {busy && (
@@ -259,7 +278,7 @@ export default function ChatPanel({
       {/* Quick command chips */}
       <div className="px-3 flex gap-1 overflow-x-auto pb-1.5 flex-shrink-0">
         {['/scan', '/ask Explain the auth flow?', '/btw', '/provider', '/help'].map((h, i) => (
-          <button key={i} onClick={() => !isBlocked && onSubmit(h)} disabled={isBlocked}
+          <button key={i} onClick={() => !isBlocked && submitCmd(h)} disabled={isBlocked}
             className="whitespace-nowrap border rounded-full text-2xs cursor-pointer flex-shrink-0"
             style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text-3)', padding: '3px 10px', opacity: isBlocked ? .4 : 1 }}>
             ⚡ {h}
@@ -273,7 +292,7 @@ export default function ChatPanel({
           style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
           {activeSuggestions.map((s, i) => (
             <div key={s.cmd}
-              onMouseEnter={() => onSuggestionIdx(i)}
+              onMouseEnter={() => setSuggestionIdx(i)}
               onClick={() => selectSuggestion(s, i)}
               className="flex items-center gap-2 px-3 py-2 cursor-pointer"
               style={{
@@ -333,7 +352,7 @@ export default function ChatPanel({
               cursor: isBlocked ? 'not-allowed' : 'text',
             }}
           />
-          <button onClick={() => onSubmit()} disabled={isBlocked || !cmd.trim()}
+          <button onClick={() => submitCmd(cmd)} disabled={isBlocked || !cmd.trim()}
             className="border-none rounded cursor-pointer font-bold text-md"
             style={{
               background: 'var(--green)', color: 'var(--bg)', padding: '.5rem .9rem',
